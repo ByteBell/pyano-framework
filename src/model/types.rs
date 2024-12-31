@@ -8,7 +8,7 @@ pub struct ModelConfig {
     pub name: String,
     pub model_path: PathBuf,
     pub model_type: ModelType,
-    pub model_kind: String, // e.g. "Qwen", "LLaMA"
+    pub model_kind: String, // e.g. "Qwen", "LLaMA", smolVLM
 
     pub memory_config: ModelMemoryConfig,
     pub prompt_template: PromptTemplate,

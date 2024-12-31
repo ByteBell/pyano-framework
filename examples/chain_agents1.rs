@@ -57,7 +57,6 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                 .build()
         )
     );
-
     // Create a chain and add agents
     let mut chain = Chain::new().add_agent(agent_1).add_agent(agent_2);
 

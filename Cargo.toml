@@ -34,13 +34,7 @@ parking_lot = "0.12.3"
 rust-bert = "0.23.0"
 dirs = "5.0.1"
 tch = { version = "0.17.0", features = ["download-libtorch"] }
-sqlx = { version = "0.8.2", default-features = false, features = [
-    "postgres",
-    "sqlite",
-    "runtime-tokio-native-tls",
-    "json",
-    "uuid",
-], optional = true }
+sqlx = { version = "0.8.2", default-features = false, features = ["postgres", "sqlite", "runtime-tokio-native-tls", "json", "uuid"], optional = true }
 sqlite-vec = "0.1.2"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 [dev-dependencies]
@@ -49,3 +43,4 @@ tokio-test = "0.4"
 [features]
 default = []
 sqlite-vec = ["sqlx"]
+sqlx = ["dep:sqlx"]

@@ -109,7 +109,7 @@ impl ModelRegistry {
         let smol_talk_path = std::env
             ::var("smolTalk_MODEL_PATH")
             .unwrap_or_else(|_|
-                "/Users/cj/Downloads/models/Llama-SmolTalk-3.2-1B-Instruct-Q8_0.gguf".to_string()
+                "/home/deadbytes/Documents/Pyano/composAIble-agents/models/Llama-SmolTalk-3.2-1B-Instruct.Q8_0.gguf".to_string()
             );
 
         configs.insert("smolTalk".to_string(), ModelConfig {
@@ -150,11 +150,11 @@ Today Date: 26 July 2024
                 extra_args: HashMap::new(),
             },
         });
-
+        /* ToDo : Add smolVlm  */
         let granite_path = std::env
             ::var("Granite_MODEL_PATH")
             .unwrap_or_else(|_|
-                "/Users/cj/Downloads/models/granite-3.1-2b-instruct-Q6_K_L.gguf".to_string()
+                "/home/deadbytes/Documents/Pyano/composAIble-agents/models/granite-3.1-2b-instruct-Q8_0.gguf".to_string()
             );
 
         configs.insert("granite".to_string(), ModelConfig {
