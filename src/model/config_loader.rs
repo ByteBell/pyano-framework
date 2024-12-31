@@ -150,12 +150,8 @@ Today Date: 26 July 2024
                 extra_args: HashMap::new(),
             },
         });
-        /* ToDo : Add smolVlm  */
         let granite_path = std::env
             ::var("Granite_MODEL_PATH")
-            .unwrap_or_else(|_|
-                "/home/deadbytes/Documents/Pyano/composAIble-agents/models/granite-3.1-2b-instruct-Q8_0.gguf".to_string()
-            );
             .unwrap_or_else(|_| "./models/granite/granite-3.1-2b-instruct-Q6_K_L.gguf".to_string());
 
         configs.insert("granite".to_string(), ModelConfig {
