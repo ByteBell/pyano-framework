@@ -4,16 +4,16 @@ use std::time::Duration;
 use chrono::{ DateTime, Utc };
 use log::{ info, error };
 use tokio::sync::oneshot;
-
+use super::adapters::llama::LlamaProcess;
 use super::{ ModelConfig, ModelStatus };
 use super::error::{ ModelError, ModelResult };
-
 pub(crate) struct ModelProcess {
     pub config: ModelConfig,
     pub child: Option<Child>,
     pub status: ModelStatus,
     pub last_used: DateTime<Utc>,
     pub shutdown_signal: Option<oneshot::Sender<()>>,
+    pub model_process: Option<LlamaProcess>,
 }
 
 impl ModelProcess {
@@ -24,6 +24,7 @@ impl ModelProcess {
             status: ModelStatus::Stopped,
             last_used: Utc::now(),
             shutdown_signal: None,
+            model_process: None,
         }
     }
 
@@ -31,42 +32,13 @@ impl ModelProcess {
         if self.status == ModelStatus::Running {
             return Ok(());
         }
-
+        info!("Starting model {}", self.config.name);
         self.status = ModelStatus::Loading;
-
-        let mut cmd = Command::new("/Users/cj/.pyano/build/bin/llama-server");
-
-        // Configure command based on adapter config
-        cmd.arg("-m")
-            .arg(&self.config.model_path)
-            .arg("--ctx-size")
-            .arg(self.config.server_config.ctx_size.to_string());
-
-        if let Some(port) = self.config.server_config.port {
-            cmd.arg("--port").arg(port.to_string());
-        }
-
-        if let Some(threads) = self.config.server_config.num_threads {
-            cmd.arg("--threads").arg(threads.to_string());
-        }
-
-        if self.config.server_config.gpu_layers > 0 {
-            cmd.arg("--n-gpu-layers").arg(self.config.server_config.gpu_layers.to_string());
-        }
-
-        if !self.config.server_config.use_mmap {
-            cmd.arg("--no-mmap");
-        }
-
-        // Add batch size
-        cmd.arg("--batch-size").arg(self.config.server_config.batch_size.to_string());
-
-        // Add extra arguments
-        for (key, value) in &self.config.server_config.extra_args {
-            cmd.arg(format!("--{}", key)).arg(value);
-        }
-
-        match cmd.spawn() {
+        self.model_process = Some(LlamaProcess::new(self.config.clone()));
+        self.model_process.as_mut().unwrap().getcmd().await;
+        let mut cmd = self.model_process.as_mut().unwrap().cmd.as_mut().unwrap();
+        info!("Starting model with command: {:?}", cmd);
+        match self.model_process.as_mut().unwrap().cmd.as_mut().unwrap().spawn() {
             Ok(child) => {
                 sleep(Duration::from_secs(10));
                 self.child = Some(child);
