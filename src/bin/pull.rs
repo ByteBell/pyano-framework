@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the argument
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: cargo run --example pull <model_path>");
+        eprintln!("Usage: cargo run --bin pull <model_path>");
         std::process::exit(1);
     }
 
