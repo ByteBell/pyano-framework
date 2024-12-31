@@ -110,6 +110,7 @@ impl ModelRegistry {
             ::var("smolTalk_MODEL_PATH")
             .unwrap_or_else(|_|
                 "./models/Llama/Llama-SmolTalk-3.2-1B-Instruct-Q8_0.gguf".to_string()
+
             );
 
         configs.insert("smolTalk".to_string(), ModelConfig {
@@ -153,6 +154,8 @@ Today Date: 26 July 2024
         let granite_path = std::env
             ::var("Granite_MODEL_PATH")
             .unwrap_or_else(|_| "./models/granite/granite-3.1-2b-instruct-Q6_K_L.gguf".to_string());
+
+
 
         configs.insert("granite".to_string(), ModelConfig {
             name: "granite".to_string(),
