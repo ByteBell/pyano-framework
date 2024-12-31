@@ -33,6 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Usage: cargo run --example pull <model_path>");
         std::process::exit(1);
     }
+
+    // will update integration of quants more smoother.
     let mut quant = None;
     for i in 1..args.len() {
         if args[i] == "--quant" && i + 1 < args.len() {
@@ -44,9 +46,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = &args[1];
 
     // Define the directory to save the model files
-    let model_name = model_path.split('/').last().unwrap().split('.').next().unwrap();
+    let model_name = model_path.split('/').last().unwrap().split('-').next().unwrap();
 
-    let mut save_dir: String;
+    let save_dir: String;
     if let Some(quant_value) = quant {
         save_dir = format!("./models/{}/{}", model_name, quant_value);
         println!("Quant value provided: {}", quant_value);
