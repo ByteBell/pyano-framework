@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // List all models from registry
     let models = manager.list_models().await?;
     let registery: ModelRegistry = ModelRegistry::new();
-
+    //TODO : Add models in listmodels from configs
     println!("\nAvailable Models in Registry:");
     println!("---------------------------");
     for model in models {
