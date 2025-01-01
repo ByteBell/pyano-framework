@@ -29,7 +29,7 @@ impl ModelRegistry {
         let model_path = std::env
             ::var("QWEN_MODEL_PATH")
             .unwrap_or_else(|_|
-                "/Users/cj/.pyano/models/Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf".to_string()
+                "./models/Qwen2.5/Qwen2.5-Coder-7B-Instruct-Q6_K_L.gguf".to_string()
             );
         // Example Qwen config
         configs.insert("qwen-7b".to_string(), ModelConfig {
@@ -69,7 +69,7 @@ impl ModelRegistry {
         let llama_path = std::env
             ::var("LLAMA_MODEL_PATH")
             .unwrap_or_else(|_|
-                "/Users/cj/Downloads/models/Qwen2.5.1-Coder-7B-Instruct-Q4_0.gguf".to_string()
+                "./models/Qwen2.5.1/Qwen2.5.1-Coder-7B-Instruct-Q4_0.gguf".to_string()
             );
 
         configs.insert("llama-7b".to_string(), ModelConfig {
@@ -109,7 +109,8 @@ impl ModelRegistry {
         let smol_talk_path = std::env
             ::var("smolTalk_MODEL_PATH")
             .unwrap_or_else(|_|
-                "/home/deadbytes/Documents/Pyano/composAIble-agents/models/Llama-SmolTalk-3.2-1B-Instruct.Q8_0.gguf".to_string()
+                "./models/Llama/Llama-SmolTalk-3.2-1B-Instruct-Q8_0.gguf".to_string()
+
             );
 
         configs.insert("smolTalk".to_string(), ModelConfig {
@@ -150,12 +151,11 @@ Today Date: 26 July 2024
                 extra_args: HashMap::new(),
             },
         });
-        /* ToDo : Add smolVlm  */
         let granite_path = std::env
             ::var("Granite_MODEL_PATH")
-            .unwrap_or_else(|_|
-                "/home/deadbytes/Documents/Pyano/composAIble-agents/models/granite-3.1-2b-instruct-Q8_0.gguf".to_string()
-            );
+            .unwrap_or_else(|_| "./models/granite/granite-3.1-2b-instruct-Q6_K_L.gguf".to_string());
+
+
 
         configs.insert("granite".to_string(), ModelConfig {
             name: "granite".to_string(),
