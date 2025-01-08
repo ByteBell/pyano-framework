@@ -350,6 +350,8 @@ impl ModelRegistry {
 
                         info!("Adding model to registry: {}", name);
                         configs.insert(name.to_string(), config);
+                        info!("Loaded configuration for model: {}", name);
+                        info!("Config values are : {:#?}", configs);
                     }
                 }
             }
