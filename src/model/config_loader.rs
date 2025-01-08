@@ -4,11 +4,11 @@ use log::info;
 
 use super::{
     ModelConfig,
-    // ModelDefaults,
-    // ModelMemoryConfig,
-    // ModelType,
-    // PromptTemplate,
-    // ServerConfig,
+    ModelDefaults,
+    ModelMemoryConfig,
+    ModelType,
+    PromptTemplate,
+    ServerConfig,
 };
 
 pub struct ModelRegistry {
@@ -205,6 +205,77 @@ pub struct ModelRegistry {
 use std::fs;
 use serde_json::Value;
 
+// impl ModelRegistry {
+//     pub fn new() -> Self {
+//         info!("Initializing ModelRegistry");
+//         let configs = Self::load_configs_from_json();
+//         Self { configs }
+//     }
+
+//     fn load_configs_from_json() -> HashMap<String, ModelConfig> {
+//         let mut configs = HashMap::new();
+//         let config_dir = std::env
+//             ::var("MODEL_CONFIG_DIR")
+//             .unwrap_or_else(|_| "src/model/config".to_string());
+
+//         info!("Loading model configurations from {}", config_dir);
+
+//         let paths = fs
+//             ::read_dir(&config_dir)
+//             .unwrap_or_else(|_| panic!("Failed to read config directory: {}", config_dir));
+
+//         for path in paths {
+//             if let Ok(entry) = path {
+//                 let path = entry.path();
+//                 if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+//                     info!("Loading config from: {:?}", path);
+
+//                     match fs::read_to_string(&path) {
+//                         Ok(config_str) => {
+//                             match serde_json::from_str::<Value>(&config_str) {
+//                                 Ok(config_json) => {
+//                                     if let Value::Object(models) = &config_json {
+//                                         for (name, model_config) in models {
+//                                             match serde_json::from_value(model_config.clone()) {
+//                                                 Ok(config) => {
+//                                                     configs.insert(name.clone(), config);
+//                                                     info!("Loaded configuration for model: {}", name);
+//                                                 }
+//                                                 Err(e) => {
+//                                                     info!(
+//                                                         "Failed to parse config for {}: {}",
+//                                                         name,
+//                                                         e
+//                                                     );
+//                                                 }
+//                                             }
+//                                         }
+//                                     }
+//                                 }
+//                                 Err(e) => info!("Failed to parse JSON from {:?}: {}", path, e),
+//                             }
+//                         }
+//                         Err(e) => info!("Failed to read file {:?}: {}", path, e),
+//                     }
+//                 }
+//             }
+//         }
+
+//         info!("Loaded {} model configurations", configs.len());
+//         configs
+//     }
+
+//     pub fn get_config(&self, model_name: &str) -> Option<&ModelConfig> {
+//         let config = self.configs.get(model_name);
+//         if config.is_none() {
+//             info!("Configuration not found for model: {}", model_name);
+//         }
+//         config
+//     }
+// }
+
+// ToDo : Add a new method that implements uses the new_schema
+
 impl ModelRegistry {
     pub fn new() -> Self {
         info!("Initializing ModelRegistry");
@@ -220,42 +291,65 @@ impl ModelRegistry {
 
         info!("Loading model configurations from {}", config_dir);
 
-        let paths = fs
-            ::read_dir(&config_dir)
-            .unwrap_or_else(|_| panic!("Failed to read config directory: {}", config_dir));
+        for entry in fs::read_dir(&config_dir).expect("Failed to read config directory") {
+            let path = entry.expect("Failed to read entry").path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                info!("Processing JSON file: {:?}", path);
 
-        for path in paths {
-            if let Ok(entry) = path {
-                let path = entry.path();
-                if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-                    info!("Loading config from: {:?}", path);
+                let config_str = fs::read_to_string(&path).expect("Failed to read config file");
 
-                    match fs::read_to_string(&path) {
-                        Ok(config_str) => {
-                            match serde_json::from_str::<Value>(&config_str) {
-                                Ok(config_json) => {
-                                    if let Value::Object(models) = &config_json {
-                                        for (name, model_config) in models {
-                                            match serde_json::from_value(model_config.clone()) {
-                                                Ok(config) => {
-                                                    configs.insert(name.clone(), config);
-                                                    info!("Loaded configuration for model: {}", name);
-                                                }
-                                                Err(e) => {
-                                                    info!(
-                                                        "Failed to parse config for {}: {}",
-                                                        name,
-                                                        e
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(e) => info!("Failed to parse JSON from {:?}: {}", path, e),
-                            }
-                        }
-                        Err(e) => info!("Failed to read file {:?}: {}", path, e),
+                let json: Value = serde_json::from_str(&config_str).expect("Failed to parse JSON");
+
+                info!("Parsed JSON structure: {:#?}", json);
+
+                // Extract base configurations
+                let memory_config = json
+                    .get("memory_config")
+                    .and_then(|v| serde_json::from_value::<ModelMemoryConfig>(v.clone()).ok())
+                    .expect("Memory config is required");
+
+                let prompt_template = json
+                    .get("prompt_template")
+                    .and_then(|v| serde_json::from_value::<PromptTemplate>(v.clone()).ok())
+                    .expect("Prompt template is required");
+
+                let defaults = json
+                    .get("defaults")
+                    .and_then(|v| serde_json::from_value::<ModelDefaults>(v.clone()).ok())
+                    .expect("Defaults are required");
+
+                let server_config = json
+                    .get("server_config")
+                    .and_then(|v| serde_json::from_value::<ServerConfig>(v.clone()).ok())
+                    .expect("Server config is required");
+
+                // Get model details directly
+                let models = json.get("models").expect("Models section is required");
+                info!("Models section: {:#?}", models);
+
+                // Process each model in the models section
+                if let Some(model_obj) = models.as_object() {
+                    for (name, details) in model_obj {
+                        info!("Processing model: {}", name);
+
+                        let config = ModelConfig {
+                            name: name.to_string(),
+                            model_type: ModelType::Text,
+                            model_kind: details["model_kind"]
+                                .as_str()
+                                .expect("model_kind is required")
+                                .to_string(),
+                            model_path: PathBuf::from(
+                                details["model_path"].as_str().expect("model_path is required")
+                            ),
+                            memory_config: memory_config.clone(),
+                            prompt_template: prompt_template.clone(),
+                            defaults: defaults.clone(),
+                            server_config: server_config.clone(),
+                        };
+
+                        info!("Adding model to registry: {}", name);
+                        configs.insert(name.to_string(), config);
                     }
                 }
             }

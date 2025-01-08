@@ -1,5 +1,6 @@
 use pyano::model::{ ModelManager, ModelManagerServer };
 use std::sync::Arc;
+use env_logger;
 
 use log::{ info, error };
 use pyano::model::config_loader::ModelRegistry;
@@ -7,6 +8,7 @@ use pyano::model::config_loader::ModelRegistry;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the manager
+    env_logger::init();
     let manager = Arc::new(ModelManager::new());
 
     // List all models from registry

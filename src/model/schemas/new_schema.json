@@ -10,8 +10,12 @@
             "name": { "type": "string" },
             "model_type": { "type": "string", "enum": ["Text"] },
             "model_kind": { "type": "string" },
-            "model_path": { "type": "string" },
-            "memory_config": {
+            "model_path": { "type": "string" }
+          },
+          "required": ["name", "model_type", "model_kind", "model_path"]
+        }
+      },
+      "memory_config": {
               "type": "object",
               "properties": {
                 "min_ram_gb": { "type": "number" },
@@ -19,11 +23,7 @@
                 "gpu_memory_gb": { "type": ["number", "null"] }
               },
               "required": ["min_ram_gb", "recommended_ram_gb"]
-            }
-          },
-          "required": ["name", "model_type", "model_kind", "model_path", "memory_config", "prompt_template", "defaults", "server_config"]
-        }
-      },
+            },
       "prompt_template": {
                 "type": "object",
                 "properties": {
@@ -65,5 +65,5 @@
             "required": ["host", "ctx_size", "gpu_layers", "batch_size", "use_mmap", "use_gpu"]
             }
     },
-    "required": ["models", "prompt_template", "defaults", "server_config"]
+    "required": ["models", "memory_config", "prompt_template", "defaults", "server_config"]
   }
