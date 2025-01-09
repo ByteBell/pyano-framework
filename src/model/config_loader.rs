@@ -368,4 +368,8 @@ impl ModelRegistry {
         }
         config
     }
+
+    pub fn get_all_configs(&self) -> Vec<(&String, &ModelConfig)> {
+        self.configs.iter().collect()
+    }
 }

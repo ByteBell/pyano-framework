@@ -1,4 +1,5 @@
 use pyano::model::{ ModelManager, ModelManagerServer };
+use rust_bert::models;
 use std::sync::Arc;
 use env_logger;
 
@@ -17,21 +18,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //TODO : Add models in listmodels from configs
     println!("\nAvailable Models in Registry:");
     println!("---------------------------");
-    for model in models {
-        println!(
-            "Name: {}\nType: {:?}\nStatus: {:?}\nServer Port: {:?}\nLast Used: {}\n",
-            model.name,
-            model.model_type,
-            model.status,
-            model.server_port,
-            model.last_used
-        );
-    }
 
+    manager.show_registry();
     // Print configs from ModelRegistry
     println!("\nFrom ModelRegistry:");
     // Try getting configs for known models
-    for model_name in ["qwen-7b", "llama-7b", "smolTalk", "granite"] {
+    for model_name in ["qwen-7b"] {
         if let Some(config) = registery.get_config(model_name) {
             println!(
                 "Name: {}\nType: {:?}\nKind: {}\nPath: {:?}\nMemory: {:?} GB (min) / {:?} GB (recommended)\nPort: {:?}\n",

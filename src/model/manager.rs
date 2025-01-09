@@ -465,6 +465,15 @@ impl ModelManager {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         info!("Lock Event [{}]: {}", timestamp, event);
     }
+
+    // Add show registry function
+
+    pub fn show_registry(&self) {
+        info!("Available models in the registry:");
+        for (name, config) in self.registry.get_all_configs() {
+            info!("Model Name: {}, Type: {:?}", name, config.model_type);
+        }
+    }
 }
 
 #[async_trait]

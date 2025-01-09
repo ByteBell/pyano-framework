@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     info!("Initializing ModelManager");
     let model_manager = Arc::new(ModelManager::new());
-
+    model_manager.show_registry();
     info!("Loading SmolTalk model");
     let content_llm = model_manager
         .clone()
