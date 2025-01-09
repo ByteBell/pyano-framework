@@ -291,6 +291,7 @@ impl ModelRegistry {
 
         info!("Loading model configurations from {}", config_dir);
 
+
         for entry in fs::read_dir(&config_dir).expect("Failed to read config directory") {
             let path = entry.expect("Failed to read entry").path();
             if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
