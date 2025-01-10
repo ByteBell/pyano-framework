@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use log::{ debug, error, info };
+use log::{ debug, error, info, warn };
 use tokio::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use std::pin::Pin;
 use bytes::Bytes;
 use futures::Stream;
 use super::manager_trait::ModelManagerInterface;
+use dotenv::dotenv;
 
 type StreamProcessor = Arc<dyn (Fn(AccumulatedStream) -> AccumulatedStream) + Send + Sync>;
 
@@ -34,7 +35,9 @@ pub struct ModelManager {
 
 impl ModelManager {
     pub fn new() -> Self {
+        dotenv().ok(); // Load .env file
         Self {
+            // Load .env file
             models: Arc::new(RwLock::new(HashMap::new())),
             registry: ModelRegistry::new(),
             system_memory: SystemMemory::new(),
@@ -261,6 +264,34 @@ impl ModelManager {
 
         // can check if model is downloaded or not here. If not downloaded shall i dowenload it here?
         // ToDo add the code to check if the model is downloaded or not. If not downloaded then download it.
+
+        //read model path from config and read model_home from env variable add and create a path like {Model_home}/{model_path} if it exits sen info model is already present otherwise sent a warn model not present
+        let model_path = config.model_path.clone();
+        let model_path_str = model_path
+            .to_str()
+            .ok_or_else(|| {
+                ModelError::ProcessError("Failed to convert model path to string".to_string())
+            })?;
+        let model_home = std::env::var("MODEL_HOME").unwrap_or_else(|_| {
+            warn!("MODEL_HOME not set in environment");
+            "models".to_string()
+        });
+
+        let model_full_path = std::path::Path
+            ::new(&format!("{}/{}", model_home, model_path_str))
+            .to_path_buf();
+        if model_full_path.exists() {
+            info!("Model {} is already present at {}", model_name, model_full_path.display());
+        } else {
+            warn!("Model {} is not present at {}", model_name, model_full_path.display());
+            let download_if_true: bool = config.download_if_not_exist;
+            if download_if_true {
+                info!("Downloading model {}", model_name);
+                // use the pull.rs to download the model.
+            } else {
+                warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
+            }
+        }
 
         let model_status = self.get_model_status(model_name).await;
         // info!("Current model status: {:?}", model_status);
