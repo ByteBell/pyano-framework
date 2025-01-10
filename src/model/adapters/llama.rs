@@ -1,9 +1,14 @@
+use std::path::PathBuf;
 use std::process::{ Child, Command };
 use std::thread::sleep;
 use std::time::Duration;
 use chrono::{ DateTime, Utc };
 use log::{ info, error };
 use tokio::sync::oneshot;
+use std::env;
+use dotenv::dotenv;
+
+use crate::model;
 
 use super::super::{ ModelConfig, ModelStatus };
 use super::super::error::{ ModelError, ModelResult };
@@ -15,6 +20,7 @@ pub(crate) struct LlamaProcess {
 
 impl LlamaProcess {
     pub fn new(config: ModelConfig) -> Self {
+        dotenv().ok();
         Self {
             config,
             cmd: None,
@@ -29,9 +35,16 @@ impl LlamaProcess {
             Command::new("./src/model/adapters/llama/ubuntu/llama-server")
         };
 
+        let model_path: PathBuf = env
+            ::var("MODEL_HOME")
+            .unwrap_or_else(|_| "./pyano_home/models".to_string())
+            .into();
+
+        let model_path = model_path.join(&self.config.model_path);
+
         // Configure command based on adapter config
         cmd.arg("-m")
-            .arg(&self.config.model_path)
+            .arg(&model_path)
             .arg("--ctx-size")
             .arg(self.config.server_config.ctx_size.to_string());
 

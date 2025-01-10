@@ -1,8 +1,12 @@
 use async_trait::async_trait;
-use log::{ debug, error, info };
+use log::{ debug, error, info, warn };
 use tokio::sync::RwLock;
+use tokio::io::AsyncBufReadExt;
+use tokio::process::Command;
+
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::env;
 
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::time::{ Duration, SystemTime, UNIX_EPOCH };
@@ -20,6 +24,7 @@ use std::pin::Pin;
 use bytes::Bytes;
 use futures::Stream;
 use super::manager_trait::ModelManagerInterface;
+use dotenv::dotenv;
 
 type StreamProcessor = Arc<dyn (Fn(AccumulatedStream) -> AccumulatedStream) + Send + Sync>;
 
@@ -34,7 +39,9 @@ pub struct ModelManager {
 
 impl ModelManager {
     pub fn new() -> Self {
+        dotenv().ok(); // Load .env file
         Self {
+            // Load .env file
             models: Arc::new(RwLock::new(HashMap::new())),
             registry: ModelRegistry::new(),
             system_memory: SystemMemory::new(),
@@ -42,6 +49,8 @@ impl ModelManager {
             lock_in_progress: Arc::new(AtomicBool::new(false)),
             last_lock_holder: Arc::new(Mutex::new(None)),
         }
+
+        // add a check here tro check if the directories provided as enviroment variables are present or not.
     }
 
     async fn acquire_models_lock<'a>(
@@ -257,6 +266,83 @@ impl ModelManager {
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
         })?;
 
+        // can check if model is downloaded or not here. If not downloaded shall i dowenload it here?
+        // ToDo add the code to check if the model is downloaded or not. If not downloaded then download it.
+
+        //read model path from config and read model_home from env variable add and create a path like {Model_home}/{model_path} if it exits sen info model is already present otherwise sent a warn model not present
+        let model_path = config.model_path.clone();
+        let model_path_str = model_path
+            .to_str()
+            .ok_or_else(|| {
+                ModelError::ProcessError("Failed to convert model path to string".to_string())
+            })?;
+        let model_home = std::env::var("MODEL_HOME").unwrap_or_else(|_| {
+            warn!("MODEL_HOME not set in environment");
+            "models".to_string()
+        });
+
+        let model_full_path = std::path::Path
+            ::new(&format!("{}/{}", model_home, model_path_str))
+            .to_path_buf();
+        if model_full_path.exists() {
+            info!("Model {} is already present at {}", model_name, model_full_path.display());
+        } else {
+            warn!("Model {} is not present at {}", model_name, model_full_path.display());
+            let download_if_true: bool = config.download_if_not_exist;
+            if download_if_true {
+                info!("Downloading model {} using pull command", model_name);
+
+                // Get model URL from config
+                if let Some(model_url) = &config.model_url {
+                    // Execute the pull command
+                    let mut command = Command::new("cargo")
+                        .arg("run")
+                        .arg("--features")
+                        .arg("sqlx")
+                        .arg("--bin")
+                        .arg("pull")
+                        .arg(model_url)
+                        .spawn()
+                        .map_err(|e|
+                            ModelError::ProcessError(
+                                format!("Failed to execute pull command: {}", e)
+                            )
+                        )?;
+
+                    // Capture the output and show progress
+                    let stdout = command.stdout.take().unwrap();
+                    let reader = tokio::io::BufReader::new(stdout);
+                    let mut lines = reader.lines();
+
+                    while let Some(line) = lines.next_line().await.unwrap_or(None) {
+                        info!("Download progress: {}", line);
+                    }
+
+                    let status = command
+                        .wait().await
+                        .map_err(|e|
+                            ModelError::ProcessError(
+                                format!("Failed to wait for pull command: {}", e)
+                            )
+                        )?;
+
+                    if !status.success() {
+                        return Err(ModelError::ProcessError("Pull command failed".to_string()));
+                    }
+
+                    info!("Model downloaded successfully using pull command");
+                } else {
+                    return Err(
+                        ModelError::ConfigError(
+                            "Model URL not provided in configuration".to_string()
+                        )
+                    );
+                }
+            } else {
+                warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
+            }
+        }
+
         let model_status = self.get_model_status(model_name).await;
         // info!("Current model status: {:?}", model_status);
 
@@ -469,6 +555,7 @@ impl ModelManager {
     // Add show registry function
 
     pub fn show_registry(&self) {
+        // get_all_models
         info!("Available models in the registry:");
         for (name, config) in self.registry.get_all_configs() {
             info!("Model Name: {}, Type: {:?}", name, config.model_type);
