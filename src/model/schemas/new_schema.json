@@ -10,7 +10,9 @@
             "name": { "type": "string" },
             "model_type": { "type": "string", "enum": ["Text"] },
             "model_kind": { "type": "string" },
-            "model_path": { "type": "string" }
+            "model_path": { "type": "string" },
+            "model_url" : { "type": "string"},
+            "Download_if_not_exist" : { "type": "boolean"}
           },
           "required": ["name", "model_type", "model_kind", "model_path"]
         }

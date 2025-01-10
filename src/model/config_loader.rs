@@ -1,6 +1,6 @@
-use std::{ collections::HashMap, path::PathBuf };
-
-use log::info;
+use std::{ collections::HashMap, path::PathBuf, env };
+use dotenv::dotenv;
+use log::{ info, warn };
 
 use super::{
     ModelConfig,
@@ -278,6 +278,7 @@ use serde_json::Value;
 
 impl ModelRegistry {
     pub fn new() -> Self {
+        dotenv().ok(); // Load .env file
         info!("Initializing ModelRegistry");
         let configs = Self::load_configs_from_json();
         Self { configs }
@@ -285,9 +286,10 @@ impl ModelRegistry {
 
     fn load_configs_from_json() -> HashMap<String, ModelConfig> {
         let mut configs = HashMap::new();
-        let config_dir = std::env
-            ::var("MODEL_CONFIG_DIR")
-            .unwrap_or_else(|_| "src/model/config".to_string());
+        let config_dir = env::var("CONFIG_HOME").unwrap_or_else(|_| {
+            warn!("CONFIG_HOME not set, using default");
+            "pyano_home/configs".to_string()
+        });
 
         info!("Loading model configurations from {}", config_dir);
 

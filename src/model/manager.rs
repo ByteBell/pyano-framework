@@ -42,6 +42,8 @@ impl ModelManager {
             lock_in_progress: Arc::new(AtomicBool::new(false)),
             last_lock_holder: Arc::new(Mutex::new(None)),
         }
+
+        // add a check here tro check if the directories provided as enviroment variables are present or not.
     }
 
     async fn acquire_models_lock<'a>(
@@ -257,6 +259,9 @@ impl ModelManager {
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
         })?;
 
+        // can check if model is downloaded or not here. If not downloaded shall i dowenload it here?
+        // ToDo add the code to check if the model is downloaded or not. If not downloaded then download it.
+
         let model_status = self.get_model_status(model_name).await;
         // info!("Current model status: {:?}", model_status);
 
@@ -469,6 +474,7 @@ impl ModelManager {
     // Add show registry function
 
     pub fn show_registry(&self) {
+        // get_all_models
         info!("Available models in the registry:");
         for (name, config) in self.registry.get_all_configs() {
             info!("Model Name: {}, Type: {:?}", name, config.model_type);
