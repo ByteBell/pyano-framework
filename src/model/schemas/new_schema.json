@@ -12,7 +12,7 @@
             "model_kind": { "type": "string" },
             "model_path": { "type": "string" },
             "model_url" : { "type": "string"},
-            "Download_if_not_exist" : { "type": "boolean"}
+            "download_if_not_exist" : { "type": "boolean"}
           },
           "required": ["name", "model_type", "model_kind", "model_path"]
         }
