@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{ copy, Write };
 use std::path::Path;
 use std::env;
+use log::info;
 use tokio::fs::create_dir_all;
 use indicatif::{ ProgressBar, ProgressStyle };
 use futures_util::StreamExt;
@@ -77,9 +78,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         save_dir = format!("{}", model_name);
         println!("No quant value provided, proceeding without it.");
     }
-    let save_dir = env::current_dir()?.join(save_dir);
-    let save_dir = save_dir.to_str().unwrap();
-    print!("Saving model files to: {}", save_dir);
+    let save_dir =
+        env::var("MODEL_HOME").unwrap_or("./pyano_home/models".to_string()) + "/" + &save_dir;
+
+    println!("Saving model files to: {}", save_dir);
     create_dir_all(save_dir.clone()).await?;
     // Download the model files
     download_model_files(model_path, &save_dir).await?;

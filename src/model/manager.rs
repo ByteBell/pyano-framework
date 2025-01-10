@@ -1,8 +1,12 @@
 use async_trait::async_trait;
 use log::{ debug, error, info, warn };
 use tokio::sync::RwLock;
+use tokio::io::AsyncBufReadExt;
+use tokio::process::Command;
+
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::env;
 
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::time::{ Duration, SystemTime, UNIX_EPOCH };
@@ -286,8 +290,54 @@ impl ModelManager {
             warn!("Model {} is not present at {}", model_name, model_full_path.display());
             let download_if_true: bool = config.download_if_not_exist;
             if download_if_true {
-                info!("Downloading model {}", model_name);
-                // use the pull.rs to download the model.
+                info!("Downloading model {} using pull command", model_name);
+
+                // Get model URL from config
+                if let Some(model_url) = &config.model_url {
+                    // Execute the pull command
+                    let mut command = Command::new("cargo")
+                        .arg("run")
+                        .arg("--features")
+                        .arg("sqlx")
+                        .arg("--bin")
+                        .arg("pull")
+                        .arg(model_url)
+                        .spawn()
+                        .map_err(|e|
+                            ModelError::ProcessError(
+                                format!("Failed to execute pull command: {}", e)
+                            )
+                        )?;
+
+                    // Capture the output and show progress
+                    let stdout = command.stdout.take().unwrap();
+                    let reader = tokio::io::BufReader::new(stdout);
+                    let mut lines = reader.lines();
+
+                    while let Some(line) = lines.next_line().await.unwrap_or(None) {
+                        info!("Download progress: {}", line);
+                    }
+
+                    let status = command
+                        .wait().await
+                        .map_err(|e|
+                            ModelError::ProcessError(
+                                format!("Failed to wait for pull command: {}", e)
+                            )
+                        )?;
+
+                    if !status.success() {
+                        return Err(ModelError::ProcessError("Pull command failed".to_string()));
+                    }
+
+                    info!("Model downloaded successfully using pull command");
+                } else {
+                    return Err(
+                        ModelError::ConfigError(
+                            "Model URL not provided in configuration".to_string()
+                        )
+                    );
+                }
             } else {
                 warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
             }
