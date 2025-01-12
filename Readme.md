@@ -165,6 +165,8 @@ Built with ❤️ using Rust
 ## Star History
 
 <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.lucabubi.me/chart?username=pyanoxyz&repository=pyano-framework&color=green" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.lucabubi.me/chart?username=pyanoxyz&repository=pyano-framework&color=green" />
    <img alt="Star History Chart" src="https://api.lucabubi.me/chart?username=pyanoxyz&repository=pyano-framework&color=green"  width="70%" />
 </picture>
 
