@@ -164,10 +164,10 @@ Built with ❤️ using Rust
 
 ## Star History
 
-<a href="https://star-history.com/#pyano/pyano-framework&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=pyano/pyano-framework&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=pyano/pyano-framework&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=pyano/pyano-framework&type=Date" />
- </picture>
-</a>
+<picture>
+   <img alt="Star History Chart" src="https://api.lucabubi.me/chart?username=pyanoxyz&repository=pyano-framework&color=green"  width="70%" />
+</picture>
+
+
+
+
