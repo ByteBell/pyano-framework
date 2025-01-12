@@ -2,6 +2,7 @@
 
 A composable, resource-efficient framework for building AI applications locally in Rust. Inspired by langchain-rs[https://github.com/Abraxas-365/langchain-rust]
 
+[![GitHub stars](https://img.shields.io/github/stars/pyanoxyz/pyano-framework)](https://github.com/pyanoxyz/pyano-framework/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🌟 Features
