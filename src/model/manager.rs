@@ -19,6 +19,7 @@ use crate::llm::llm_builder::LLM;
 use crate::llm::options::LLMHTTPCallOptions;
 use crate::llm::stream_processing::llamacpp_process_stream;
 use crate::llm::types::AccumulatedStream;
+use crate::tools::downloader::download::download_model_files;
 
 use std::pin::Pin;
 use bytes::Bytes;
@@ -290,54 +291,12 @@ impl ModelManager {
             warn!("Model {} is not present at {}", model_name, model_full_path.display());
             let download_if_true: bool = config.download_if_not_exist;
             if download_if_true {
-                info!("Downloading model {} using pull command", model_name);
-
-                // Get model URL from config
-                if let Some(model_url) = &config.model_url {
-                    // Execute the pull command
-                    let mut command = Command::new("cargo")
-                        .arg("run")
-                        .arg("--features")
-                        .arg("sqlx")
-                        .arg("--bin")
-                        .arg("pull")
-                        .arg(model_url)
-                        .spawn()
-                        .map_err(|e|
-                            ModelError::ProcessError(
-                                format!("Failed to execute pull command: {}", e)
-                            )
-                        )?;
-
-                    // Capture the output and show progress
-                    let stdout = command.stdout.take().unwrap();
-                    let reader = tokio::io::BufReader::new(stdout);
-                    let mut lines = reader.lines();
-
-                    while let Some(line) = lines.next_line().await.unwrap_or(None) {
-                        info!("Download progress: {}", line);
-                    }
-
-                    let status = command
-                        .wait().await
-                        .map_err(|e|
-                            ModelError::ProcessError(
-                                format!("Failed to wait for pull command: {}", e)
-                            )
-                        )?;
-
-                    if !status.success() {
-                        return Err(ModelError::ProcessError("Pull command failed".to_string()));
-                    }
-
-                    info!("Model downloaded successfully using pull command");
-                } else {
-                    return Err(
-                        ModelError::ConfigError(
-                            "Model URL not provided in configuration".to_string()
-                        )
-                    );
-                }
+                info!("Downloading model {}", model_name);
+                download_model_files(
+                    config.model_url.as_deref().unwrap(),
+                    model_full_path.to_str().unwrap()
+                ).await.map_err(|e| ModelError::ProcessError(e.to_string()))?;
+                info!("Model {} downloaded successfully", model_name);
             } else {
                 warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
             }
