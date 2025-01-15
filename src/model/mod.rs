@@ -8,6 +8,7 @@ pub mod config_loader;
 pub mod system_memory;
 pub mod manager_trait;
 pub mod adapters;
+pub mod utils;
 
 mod client;
 mod server;

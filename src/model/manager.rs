@@ -6,7 +6,8 @@ use tokio::process::Command;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::env;
+
+use super::utils::get_env_var;
 
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::time::{ Duration, SystemTime, UNIX_EPOCH };
@@ -25,7 +26,6 @@ use std::pin::Pin;
 use bytes::Bytes;
 use futures::Stream;
 use super::manager_trait::ModelManagerInterface;
-use dotenv::dotenv;
 
 type StreamProcessor = Arc<dyn (Fn(AccumulatedStream) -> AccumulatedStream) + Send + Sync>;
 
@@ -40,9 +40,7 @@ pub struct ModelManager {
 
 impl ModelManager {
     pub fn new() -> Self {
-        dotenv().ok(); // Load .env file
         Self {
-            // Load .env file
             models: Arc::new(RwLock::new(HashMap::new())),
             registry: ModelRegistry::new(),
             system_memory: SystemMemory::new(),
@@ -260,7 +258,7 @@ impl ModelManager {
         self: Arc<Self>,
         model_name: &str,
         options: Option<LLMHTTPCallOptions>,
-        auto_load: bool
+        auto_load: bool // To pass a object struct with options how to handle memory loading ( AutoLoad, Unload after use etc.)
     ) -> ModelResult<LLM> {
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
@@ -277,11 +275,7 @@ impl ModelManager {
             .ok_or_else(|| {
                 ModelError::ProcessError("Failed to convert model path to string".to_string())
             })?;
-        let model_home = std::env::var("MODEL_HOME").unwrap_or_else(|_| {
-            warn!("MODEL_HOME not set in environment");
-            "models".to_string()
-        });
-
+        let model_home = get_env_var("MODEL_HOME").unwrap_or("pyano_home/models".to_string());
         let model_full_path = std::path::Path
             ::new(&format!("{}/{}", model_home, model_path_str))
             .to_path_buf();
@@ -353,6 +347,8 @@ impl ModelManager {
         if llm_options.temperature.is_none() {
             llm_options = llm_options.with_temperature(config.defaults.temperature);
         }
+
+
 
         let processor = Self::get_processor_for_model(&config);
         // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());

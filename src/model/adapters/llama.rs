@@ -5,9 +5,7 @@ use std::time::Duration;
 use chrono::{ DateTime, Utc };
 use log::{ info, error };
 use tokio::sync::oneshot;
-use std::env;
-use dotenv::dotenv;
-
+use super::super::utils::get_env_var;
 use crate::model;
 
 use super::super::{ ModelConfig, ModelStatus };
@@ -20,7 +18,6 @@ pub(crate) struct LlamaProcess {
 
 impl LlamaProcess {
     pub fn new(config: ModelConfig) -> Self {
-        dotenv().ok();
         Self {
             config,
             cmd: None,
@@ -35,10 +32,9 @@ impl LlamaProcess {
             Command::new("./src/model/adapters/llama/ubuntu/llama-server")
         };
 
-        let model_path: PathBuf = env
-            ::var("MODEL_HOME")
-            .unwrap_or_else(|_| "./pyano_home/models".to_string())
-            .into();
+        let model_path: PathBuf = get_env_var("MODEL_HOME")
+            .map(|path| PathBuf::from(path))
+            .unwrap_or_else(|| PathBuf::from("pyano_hoem/models"));
 
         let model_path = model_path.join(&self.config.model_path);
 
