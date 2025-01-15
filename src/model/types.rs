@@ -9,7 +9,8 @@ pub struct ModelConfig {
     pub model_path: PathBuf,
     pub model_type: ModelType,
     pub model_kind: String, // e.g. "Qwen", "LLaMA", smolVLM
-
+    pub model_url: Option<String>,
+    pub download_if_not_exist: bool,
     pub memory_config: ModelMemoryConfig,
     pub prompt_template: PromptTemplate,
     pub defaults: ModelDefaults,

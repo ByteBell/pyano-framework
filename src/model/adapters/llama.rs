@@ -1,12 +1,12 @@
-// todo this will use the llama.cpp
-// the address to adapter will be given in config to the model manager
-
+use std::path::PathBuf;
 use std::process::{ Child, Command };
 use std::thread::sleep;
 use std::time::Duration;
 use chrono::{ DateTime, Utc };
 use log::{ info, error };
 use tokio::sync::oneshot;
+use super::super::utils::get_env_var;
+use crate::model;
 
 use super::super::{ ModelConfig, ModelStatus };
 use super::super::error::{ ModelError, ModelResult };
@@ -32,9 +32,15 @@ impl LlamaProcess {
             Command::new("./src/model/adapters/llama/ubuntu/llama-server")
         };
 
+        let model_path: PathBuf = get_env_var("MODEL_HOME")
+            .map(|path| PathBuf::from(path))
+            .unwrap_or_else(|| PathBuf::from("pyano_hoem/models"));
+
+        let model_path = model_path.join(&self.config.model_path);
+
         // Configure command based on adapter config
         cmd.arg("-m")
-            .arg(&self.config.model_path)
+            .arg(&model_path)
             .arg("--ctx-size")
             .arg(self.config.server_config.ctx_size.to_string());
 

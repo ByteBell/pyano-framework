@@ -9,3 +9,6 @@ pub use duckduckgo::*;
 
 mod command_executor;
 pub use command_executor::*;
+
+pub mod downloader;
+pub use downloader::*;

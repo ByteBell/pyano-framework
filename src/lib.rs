@@ -1,3 +1,9 @@
+use dotenv::dotenv;
+
+pub fn init() {
+    dotenv().ok();
+}
+
 pub mod agent;
 pub mod model;
 pub mod types;
