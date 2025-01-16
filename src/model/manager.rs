@@ -129,14 +129,16 @@ impl ModelManager {
         )
     }
     pub async fn load_model(&self, config: ModelConfig) -> ModelResult<()> {
-        self.record_lock_event(&format!("Starting load_model for {}", config.name));
+        self.record_lock_event(&format!("Starting load_model for {}", config.model_config.name));
 
         // First check if model is already loaded without holding write lock
         {
             let read_guard = self.models.read().await;
-            if let Some(process) = read_guard.get(&config.name) {
+            if let Some(process) = read_guard.get(&config.model_config.name) {
                 if process.status == ModelStatus::Running {
-                    self.record_lock_event(&format!("Model {} already loaded", config.name));
+                    self.record_lock_event(
+                        &format!("Model {} already loaded", config.model_config.name)
+                    );
                     return Ok(());
                 }
             }
@@ -148,10 +150,10 @@ impl ModelManager {
         // Memory management with proper lock release
         match self.manage_memory(config.memory_config.min_ram_gb).await {
             Ok(_) => {
-                info!("Memory requirements satisfied for model {}", config.name);
+                info!("Memory requirements satisfied for model {}", config.model_config.name);
             }
             Err(e) => {
-                error!("Failed to allocate memory for model {}: {}", config.name, e);
+                error!("Failed to allocate memory for model {}: {}", config.model_config.name, e);
                 return Err(e);
             }
         }
@@ -170,9 +172,11 @@ impl ModelManager {
         let mut process = ModelProcess::new(config.clone());
         match process.start().await {
             Ok(_) => {
-                info!("Successfully started model process: {}", config.name);
-                models.insert(config.name.clone(), process);
-                self.record_lock_event(&format!("Successfully loaded model {}", config.name));
+                info!("Successfully started model process: {}", config.model_config.name);
+                models.insert(config.model_config.name.clone(), process);
+                self.record_lock_event(
+                    &format!("Successfully loaded model {}", config.model_config.name)
+                );
                 Ok(())
             }
             Err(e) => {
@@ -180,6 +184,16 @@ impl ModelManager {
                 self.record_lock_event(&format!("Failed to start model process: {}", e));
                 Err(e)
             }
+        }
+    }
+
+    pub async fn show_model_details(&self) {
+        let models = self.models.read().await;
+        for (name, process) in models.iter() {
+            info!("Model Name: {}", name);
+            info!("Model Config: {:?}", process.config);
+            info!("Model Process: \n");
+            process.show_details().await;
         }
     }
 
@@ -220,8 +234,8 @@ impl ModelManager {
             models
                 .values()
                 .map(|process| ModelInfo {
-                    name: process.config.name.clone(),
-                    model_type: process.config.model_type.clone(),
+                    name: process.config.model_config.name.clone(),
+                    model_type: process.config.model_config.model_type.clone(),
                     status: process.status.clone(),
                     last_used: process.last_used,
                     server_port: process.config.server_config.port,
@@ -231,9 +245,9 @@ impl ModelManager {
     }
 
     fn get_processor_for_model(config: &ModelConfig) -> StreamProcessor {
-        match config.model_type {
+        match config.model_config.model_type {
             ModelType::Text =>
-                match config.model_kind.as_str() {
+                match config.model_config.model_kind.as_str() {
                     "LLaMA" =>
                         Arc::new(move |stream: AccumulatedStream| -> AccumulatedStream {
                             Box::pin(llamacpp_process_stream(stream))
@@ -269,7 +283,7 @@ impl ModelManager {
         // ToDo add the code to check if the model is downloaded or not. If not downloaded then download it.
 
         //read model path from config and read model_home from env variable add and create a path like {Model_home}/{model_path} if it exits sen info model is already present otherwise sent a warn model not present
-        let model_path = config.model_path.clone();
+        let model_path = config.model_config.model_path.clone();
         let model_path_str = model_path
             .to_str()
             .ok_or_else(|| {
@@ -283,11 +297,11 @@ impl ModelManager {
             info!("Model {} is already present at {}", model_name, model_full_path.display());
         } else {
             warn!("Model {} is not present at {}", model_name, model_full_path.display());
-            let download_if_true: bool = config.download_if_not_exist;
+            let download_if_true: bool = config.model_config.download_if_not_exist;
             if download_if_true {
                 info!("Downloading model {}", model_name);
                 download_model_files(
-                    config.model_url.as_deref().unwrap(),
+                    config.model_config.model_url.as_deref().unwrap(),
                     model_full_path.to_str().unwrap()
                 ).await.map_err(|e| ModelError::ProcessError(e.to_string()))?;
                 info!("Model {} downloaded successfully", model_name);
@@ -347,8 +361,6 @@ impl ModelManager {
         if llm_options.temperature.is_none() {
             llm_options = llm_options.with_temperature(config.defaults.temperature);
         }
-
-
 
         let processor = Self::get_processor_for_model(&config);
         // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
@@ -513,7 +525,7 @@ impl ModelManager {
         // get_all_models
         info!("Available models in the registry:");
         for (name, config) in self.registry.get_all_configs() {
-            info!("Model Name: {}, Type: {:?}", name, config.model_type);
+            info!("Model Name: {}, Type: {:?}", name, config.model_config.model_type);
         }
     }
 }

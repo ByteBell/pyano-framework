@@ -24,6 +24,15 @@ impl LlamaProcess {
         }
     }
 
+    pub async fn show_details(self) {
+        println!("Model Config: {:?}", self.config);
+        if let Some(cmd) = &self.cmd {
+            println!("Command: {:?}", cmd);
+        } else {
+            println!("Command: None");
+        }
+    }
+
     pub async fn getcmd(&mut self) {
         /* ToDO Implement server based on machine type */
         let mut cmd = if cfg!(target_os = "macos") {

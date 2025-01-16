@@ -31,6 +31,8 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             e
         })?;
 
+    model_manager.show_model_details().await;
+
     // Create agents
     let agent_1 = Arc::new(
         Mutex::new(
@@ -59,11 +61,12 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     );
     // Create a chain and add agents
     let mut chain = Chain::new().add_agent(agent_1).add_agent(agent_2);
-
+    model_manager.show_model_details().await;
     // Run the chain
     if let Err(e) = chain.run().await {
         eprintln!("Error executing chain: {}", e);
     }
+    model_manager.show_model_details().await;
 
     // Access the memory logs
     let logs = chain.memory_logs();
@@ -76,5 +79,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             log.timestamp
         );
     }
+    model_manager.show_model_details().await;
+
     Ok(())
 }

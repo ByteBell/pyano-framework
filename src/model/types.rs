@@ -5,16 +5,21 @@ use chrono::{ DateTime, Utc };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
-    pub name: String,
-    pub model_path: PathBuf,
-    pub model_type: ModelType,
-    pub model_kind: String, // e.g. "Qwen", "LLaMA", smolVLM
-    pub model_url: Option<String>,
-    pub download_if_not_exist: bool,
+    pub model_config: ModelSpecificConfig,
     pub memory_config: ModelMemoryConfig,
     pub prompt_template: PromptTemplate,
     pub defaults: ModelDefaults,
     pub server_config: ServerConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelSpecificConfig {
+    pub name: String,
+    pub model_path: PathBuf,
+    pub model_type: ModelType,
+    pub model_kind: String,
+    pub model_url: Option<String>,
+    pub download_if_not_exist: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

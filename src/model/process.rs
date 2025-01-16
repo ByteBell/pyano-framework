@@ -28,6 +28,15 @@ impl ModelProcess {
         }
     }
 
+    pub async fn show_details(&self) {
+        println!("ModelProcess Details:");
+        println!("Config: {:?}", self.config);
+        println!("Child: {:?}", self.child);
+        println!("Status: {:?}", self.status);
+        println!("Last Used: {:?}", self.last_used);
+        println!("Shutdown Signal: {:?}", self.shutdown_signal);
+    }
+
     pub async fn start(&mut self) -> ModelResult<()> {
         if self.status == ModelStatus::Running {
             return Ok(());

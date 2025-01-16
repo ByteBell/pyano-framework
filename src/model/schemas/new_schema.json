@@ -2,10 +2,8 @@
     "$schema" : "http://json-schema.org/draft-07/schema#",
     "type" : "object",
     "properties": {
-      "models": {
+      "model_config": {
         "type": "object",
-        "additionalProperties": {
-          "type": "object",
           "properties": {
             "name": { "type": "string" },
             "model_type": { "type": "string", "enum": ["Text"] },
@@ -15,7 +13,6 @@
             "download_if_not_exist" : { "type": "boolean"}
           },
           "required": ["name", "model_type", "model_kind", "model_path"]
-        }
       },
       "memory_config": {
               "type": "object",
@@ -67,5 +64,5 @@
             "required": ["host", "ctx_size", "gpu_layers", "batch_size", "use_mmap", "use_gpu"]
             }
     },
-    "required": ["models", "memory_config", "prompt_template", "defaults", "server_config"]
+    "required": ["model_config", "memory_config", "prompt_template", "defaults", "server_config"]
   }
