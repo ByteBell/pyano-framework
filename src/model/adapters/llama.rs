@@ -1,27 +1,19 @@
 use std::path::PathBuf;
 use std::process::Command;
 use super::super::utils::get_env_var;
-use super::super::ModelConfig;
+use super::super::state::ModelState;
 
+#[derive(Debug)]
 pub(crate) struct LlamaProcess {
-    pub config: ModelConfig,
+    pub state: ModelState,
     pub cmd: Option<Command>,
 }
 
 impl LlamaProcess {
-    pub fn new(config: ModelConfig) -> Self {
+    pub fn new(state: ModelState) -> Self {
         Self {
-            config,
+            state: state,
             cmd: None,
-        }
-    }
-
-    pub async fn show_details(self) {
-        println!("Model Config: {:?}", self.config);
-        if let Some(cmd) = &self.cmd {
-            println!("Command: {:?}", cmd);
-        } else {
-            println!("Command: None");
         }
     }
 
@@ -37,35 +29,35 @@ impl LlamaProcess {
             .map(|path| PathBuf::from(path))
             .expect("MODEL_HOME environment variable not set");
 
-        let model_path = model_path.join(&self.config.model_config.model_path);
+        let model_path = model_path.join(&*self.state.model_path.lock().unwrap());
 
         // Configure command based on adapter config
         cmd.arg("-m")
             .arg(&model_path)
             .arg("--ctx-size")
-            .arg(self.config.server_config.ctx_size.to_string());
+            .arg(self.state.config.server_config.ctx_size.to_string());
 
-        if let Some(port) = self.config.server_config.port {
+        if let Some(port) = *self.state.port.lock().unwrap() {
             cmd.arg("--port").arg(port.to_string());
         }
 
-        if let Some(threads) = self.config.server_config.num_threads {
+        if let Some(threads) = self.state.config.server_config.num_threads {
             cmd.arg("--threads").arg(threads.to_string());
         }
 
-        if self.config.server_config.gpu_layers > 0 {
-            cmd.arg("--n-gpu-layers").arg(self.config.server_config.gpu_layers.to_string());
+        if self.state.config.server_config.gpu_layers > 0 {
+            cmd.arg("--n-gpu-layers").arg(self.state.config.server_config.gpu_layers.to_string());
         }
 
-        if !self.config.server_config.use_mmap {
+        if !self.state.config.server_config.use_mmap {
             cmd.arg("--no-mmap");
         }
 
         // Add batch size
-        cmd.arg("--batch-size").arg(self.config.server_config.batch_size.to_string());
+        cmd.arg("--batch-size").arg(self.state.config.server_config.batch_size.to_string());
 
         // Add extra arguments
-        for (key, value) in &self.config.server_config.extra_args {
+        for (key, value) in &self.state.config.server_config.extra_args {
             cmd.arg(format!("--{}", key)).arg(value);
         }
 

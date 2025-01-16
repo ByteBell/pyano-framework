@@ -3,6 +3,7 @@ use log::{ debug, error, info, warn };
 use tokio::sync::RwLock;
 use tokio::io::AsyncBufReadExt;
 use tokio::process::Command;
+use super::state::{ self, ModelState };
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -128,16 +129,18 @@ impl ModelManager {
             )
         )
     }
-    pub async fn load_model(&self, config: ModelConfig) -> ModelResult<()> {
-        self.record_lock_event(&format!("Starting load_model for {}", config.model_config.name));
+    pub async fn load_model(&self, state: ModelState) -> ModelResult<()> {
+        self.record_lock_event(
+            &format!("Starting load_model for {}", state.config.model_config.name)
+        );
 
         // First check if model is already loaded without holding write lock
         {
             let read_guard = self.models.read().await;
-            if let Some(process) = read_guard.get(&config.model_config.name) {
-                if process.status == ModelStatus::Running {
+            if let Some(process) = read_guard.get(&state.config.model_config.name) {
+                if *process.state.status.lock().unwrap() == ModelStatus::Running {
                     self.record_lock_event(
-                        &format!("Model {} already loaded", config.model_config.name)
+                        &format!("Model {} already loaded", state.config.model_config.name)
                     );
                     return Ok(());
                 }
@@ -148,12 +151,16 @@ impl ModelManager {
         self.system_memory.debug_memory_info().await;
 
         // Memory management with proper lock release
-        match self.manage_memory(config.memory_config.min_ram_gb).await {
+        match self.manage_memory(state.config.memory_config.min_ram_gb).await {
             Ok(_) => {
-                info!("Memory requirements satisfied for model {}", config.model_config.name);
+                info!("Memory requirements satisfied for model {}", state.config.model_config.name);
             }
             Err(e) => {
-                error!("Failed to allocate memory for model {}: {}", config.model_config.name, e);
+                error!(
+                    "Failed to allocate memory for model {}: {}",
+                    state.config.model_config.name,
+                    e
+                );
                 return Err(e);
             }
         }
@@ -169,13 +176,13 @@ impl ModelManager {
             }
         };
 
-        let mut process = ModelProcess::new(config.clone());
+        let mut process = ModelProcess::new(state.clone());
         match process.start().await {
             Ok(_) => {
-                info!("Successfully started model process: {}", config.model_config.name);
-                models.insert(config.model_config.name.clone(), process);
+                info!("Successfully started model process: {}", state.config.model_config.name);
+                models.insert(state.config.model_config.name.clone(), process);
                 self.record_lock_event(
-                    &format!("Successfully loaded model {}", config.model_config.name)
+                    &format!("Successfully loaded model {}", state.config.model_config.name)
                 );
                 Ok(())
             }
@@ -191,9 +198,8 @@ impl ModelManager {
         let models = self.models.read().await;
         for (name, process) in models.iter() {
             info!("Model Name: {}", name);
-            info!("Model Config: {:?}", process.config);
+            info!("Model Config: {:?}", process.state.config);
             info!("Model Process: \n");
-            process.show_details().await;
         }
     }
 
@@ -203,7 +209,8 @@ impl ModelManager {
             .ok_or_else(|| {
                 ModelError::ModelNotFound(format!("Configuration not found for model: {}", name))
             })?;
-        self.load_model(config.clone()).await
+        let state = ModelState::new(config.clone());
+        self.load_model(state.clone()).await
     }
 
     pub async fn unload_model(&self, name: &str) -> ModelResult<()> {
@@ -222,27 +229,27 @@ impl ModelManager {
         let models = self.models.read().await;
 
         match models.get(name) {
-            Some(process) => Ok(process.status.clone()),
+            Some(process) => Ok(process.state.status.lock().unwrap().clone()),
             None => Err(ModelError::ModelNotFound(name.to_string())),
         }
     }
 
-    pub async fn list_models(&self) -> ModelResult<Vec<ModelInfo>> {
-        let models = self.models.read().await;
+    // pub async fn list_models(&self) -> ModelResult<Vec<ModelInfo>> {
+    //     let models = self.models.read().await;
 
-        Ok(
-            models
-                .values()
-                .map(|process| ModelInfo {
-                    name: process.config.model_config.name.clone(),
-                    model_type: process.config.model_config.model_type.clone(),
-                    status: process.status.clone(),
-                    last_used: process.last_used,
-                    server_port: process.config.server_config.port,
-                })
-                .collect()
-        )
-    }
+    //     Ok(
+    //         models
+    //             .values()
+    //             .map(|process| ModelInfo {
+    //                 name: process.state.config.model_config.name.clone(),
+    //                 model_type: process.state.config.model_config.model_type.clone(),
+    //                 status: process.status.clone(),
+    //                 last_used: process.last_used,
+    //                 server_port: process.config.server_config.port,
+    //             })
+    //             .collect()
+    //     )
+    // }
 
     fn get_processor_for_model(config: &ModelConfig) -> StreamProcessor {
         match config.model_config.model_type {
@@ -274,15 +281,15 @@ impl ModelManager {
         options: Option<LLMHTTPCallOptions>,
         auto_load: bool // To pass a object struct with options how to handle memory loading ( AutoLoad, Unload after use etc.)
     ) -> ModelResult<LLM> {
+        async fn with_state() {
+            info!("Command to start model with dynamic configuration: ");
+            // ToDo: Implement the logic to start the model with dynamic configuration
+        }
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
         })?;
 
-        // can check if model is downloaded or not here. If not downloaded shall i dowenload it here?
-        // ToDo add the code to check if the model is downloaded or not. If not downloaded then download it.
-
-        //read model path from config and read model_home from env variable add and create a path like {Model_home}/{model_path} if it exits sen info model is already present otherwise sent a warn model not present
         let model_path = config.model_config.model_path.clone();
         let model_path_str = model_path
             .to_str()
@@ -312,7 +319,7 @@ impl ModelManager {
 
         let model_status = self.get_model_status(model_name).await;
         // info!("Current model status: {:?}", model_status);
-
+        let state = ModelState::new(config.clone());
         // Only load the model immediately if auto_load is true
         if auto_load {
             let model_status = self.get_model_status(model_name).await;
@@ -322,7 +329,7 @@ impl ModelManager {
                 }
                 _ => {
                     info!("Loading model: {}", model_name);
-                    self.load_model(config.clone()).await?;
+                    self.load_model(state.clone()).await?;
                     // Verify model was loaded successfully
                     match self.get_model_status(model_name).await? {
                         ModelStatus::Running => {
@@ -422,11 +429,11 @@ impl ModelManager {
         // Convert to vec for sorting
         let mut model_times: Vec<_> = models
             .iter()
-            .map(|(k, v)| (k.clone(), v.last_used))
+            .map(|(k, v)| (k.clone(), v.state.last_used.clone()))
             .collect();
 
         // Sort by last used time (oldest first)
-        model_times.sort_by_key(|(_k, v)| *v);
+        model_times.sort_by_key(|(_k, v)| *v.lock().unwrap());
 
         // Track unloading results
         let mut freed_memory = 0.0;
@@ -436,7 +443,7 @@ impl ModelManager {
         // Unload models until we have enough memory
         for (model_name, _) in model_times {
             if let Some(process) = models.get_mut(&model_name) {
-                let model_memory = process.config.memory_config.min_ram_gb;
+                let model_memory = process.state.config.memory_config.min_ram_gb;
 
                 info!("Attempting to unload model: {}", model_name);
 
@@ -534,7 +541,9 @@ impl ModelManager {
 impl ModelManagerInterface for ModelManager {
     async fn load_model(&self, config: ModelConfig) -> ModelResult<()> {
         // Existing implementation
-        self.load_model(config).await
+        // ToDO need some clarity here
+        let state = ModelState::new(config.clone());
+        self.load_model(state).await
     }
 
     async fn unload_model(&self, name: &str) -> ModelResult<()> {

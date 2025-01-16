@@ -1,13 +1,12 @@
 use std::sync::{ Arc, Mutex };
-use tokio::sync::Mutex as TokioMutex;
-use serde::{ Deserialize, Serialize };
 use chrono::{ DateTime, Utc };
 use crate::model::{ ModelConfig, ModelStatus };
 use std::path::PathBuf;
+use super::adapters::llama::LlamaProcess;
+use tokio::sync::oneshot;
 
 // ToDo This will contain a state of the model like ths wll have the lve nformation about the model running like which port t s runing on which parameters are updated by the users etc. Now the confgs held by
 // ModelProcess LLamaProcess and other process which come into accont when runnng the models will be omitted and all the informaton sharng will only happen throgh the state
-
 #[derive(Debug, Clone)]
 pub struct ModelState {
     // Configuration
@@ -36,7 +35,6 @@ pub struct ModelState {
 
     // Process management
     pub process_id: Arc<Mutex<Option<u32>>>,
-    pub process_handle: Arc<TokioMutex<Option<tokio::process::Child>>>,
 }
 
 impl ModelState {
@@ -54,10 +52,9 @@ impl ModelState {
             max_tokens: Arc::new(Mutex::new(config.defaults.max_tokens)),
             repetition_penalty: Arc::new(Mutex::new(config.defaults.repetition_penalty)),
             port: Arc::new(Mutex::new(config.server_config.port)),
-            status: Arc::new(Mutex::new(ModelStatus::Loading)),
+            status: Arc::new(Mutex::new(ModelStatus::Stopped)),
             last_used: Arc::new(Mutex::new(Utc::now())),
             process_id: Arc::new(Mutex::new(None)),
-            process_handle: Arc::new(TokioMutex::new(None)),
         }
     }
 
@@ -72,9 +69,5 @@ impl ModelState {
     pub fn update_process_id(&self, process_id: u32) {
         let mut process_id_guard = self.process_id.lock().unwrap();
         *process_id_guard = Some(process_id);
-    }
-    pub async fn update_process_handle(&self, new_process_handle: tokio::process::Child) {
-        let mut process_handle = self.process_handle.lock().await;
-        *process_handle = Some(new_process_handle);
     }
 }
