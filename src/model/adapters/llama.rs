@@ -1,15 +1,7 @@
 use std::path::PathBuf;
-use std::process::{ Child, Command };
-use std::thread::sleep;
-use std::time::Duration;
-use chrono::{ DateTime, Utc };
-use log::{ info, error };
-use tokio::sync::oneshot;
+use std::process::Command;
 use super::super::utils::get_env_var;
-use crate::model;
-
-use super::super::{ ModelConfig, ModelStatus };
-use super::super::error::{ ModelError, ModelResult };
+use super::super::ModelConfig;
 
 pub(crate) struct LlamaProcess {
     pub config: ModelConfig,
@@ -43,9 +35,9 @@ impl LlamaProcess {
 
         let model_path: PathBuf = get_env_var("MODEL_HOME")
             .map(|path| PathBuf::from(path))
-            .unwrap_or_else(|| PathBuf::from("pyano_hoem/models"));
+            .expect("MODEL_HOME environment variable not set");
 
-        let model_path = model_path.join(&self.config.model_path);
+        let model_path = model_path.join(&self.config.model_config.model_path);
 
         // Configure command based on adapter config
         cmd.arg("-m")
