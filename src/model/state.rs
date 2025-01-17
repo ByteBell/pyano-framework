@@ -66,4 +66,19 @@ impl ModelState {
         let mut process_id_guard = self.process_id.lock().unwrap();
         *process_id_guard = Some(process_id);
     }
+    pub fn show_state(&self) {
+        let status = self.status.lock().unwrap();
+        //print all the variables that show information about the model,
+        //like model_path, model_url, min_ram_usage, recommended_ram_gb, gpu_memory_gb, temperature, top_k, top_p, max_tokens, repetition_penalty, port, status, last_used, process_id
+        println!("Model Path: {:?}", self.model_path.lock().unwrap());
+        println!("Temperature: {:?}", self.temperature.lock().unwrap());
+        println!("Top K: {:?}", self.top_k.lock().unwrap());
+        println!("Top P: {:?}", self.top_p.lock().unwrap());
+        println!("Max Tokens: {:?}", self.max_tokens.lock().unwrap());
+        println!("Repetition Penalty: {:?}", self.repetition_penalty.lock().unwrap());
+        println!("Port: {:?}", self.port.lock().unwrap());
+        println!("Status: {:?}", status);
+        println!("Last Used: {:?}", self.last_used.lock().unwrap());
+        println!("Process ID: {:?}", self.process_id.lock().unwrap());
+    }
 }

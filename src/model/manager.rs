@@ -215,9 +215,9 @@ impl ModelManager {
     pub async fn show_model_details(&self) {
         let models = self.models.read().await;
         for (name, process) in models.iter() {
-            info!("Model Name: {}", name);
-            info!("Model Config: {:?}", process.state.config);
+            info!("Model Name: {} \n", name);
             info!("Model Process: \n");
+            process.state.show_state();
         }
     }
 
