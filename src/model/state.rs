@@ -2,11 +2,7 @@ use std::sync::{ Arc, Mutex };
 use chrono::{ DateTime, Utc };
 use crate::model::{ ModelConfig, ModelStatus };
 use std::path::PathBuf;
-use super::adapters::llama::LlamaProcess;
-use tokio::sync::oneshot;
 
-// ToDo This will contain a state of the model like ths wll have the lve nformation about the model running like which port t s runing on which parameters are updated by the users etc. Now the confgs held by
-// ModelProcess LLamaProcess and other process which come into accont when runnng the models will be omitted and all the informaton sharng will only happen throgh the state
 #[derive(Debug, Clone)]
 pub struct ModelState {
     // Configuration

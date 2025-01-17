@@ -1,7 +1,6 @@
-use std::{ collections::HashMap, path::PathBuf, env };
-use log::{ info, warn };
-
-use crate::model::{ utils::get_env_var };
+use std::collections::HashMap;
+use log::info;
+use crate::model::utils::get_env_var;
 
 use super::{
     ModelConfig,

@@ -25,7 +25,8 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     let llama_llm = model_manager
         .clone()
-        .get_or_create_llm("granite", None, true).await
+        .get_or_create_llm("granite", None, true).await?
+        .with_state()
         .map_err(|e| {
             error!("Failed to load Granite model: {}", e);
             e
@@ -43,7 +44,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                     "Generate content on the topic - Future of AI agentix framework".to_string()
                 )
                 .with_stream(true)
-                .with_llm(content_llm)
+                .with_llm(content_llm.llm.clone())
                 .build()
         )
     );

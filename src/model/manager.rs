@@ -1,9 +1,7 @@
 use async_trait::async_trait;
-use log::{ debug, error, info, warn };
+use log::{ error, info, warn };
 use tokio::sync::RwLock;
-use tokio::io::AsyncBufReadExt;
-use tokio::process::Command;
-use super::state::{ self, ModelState };
+use super::state::ModelState;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -37,6 +35,26 @@ pub struct ModelManager {
 
     lock_in_progress: Arc<AtomicBool>,
     last_lock_holder: Arc<Mutex<Option<String>>>, // For debugging
+}
+pub struct LLMResult {
+    pub llm: LLM,
+    pub state: Option<Arc<ModelState>>,
+    manager: Arc<ModelManager>,
+}
+
+impl LLMResult {
+    pub fn with_state(self) -> ModelResult<LLM> {
+        // Access and configure state
+        if let Some(state) = self.state {
+            info!("Configuring LLM with dynamic state");
+            // Configure dynamic parameters
+            // pass optional parameters and handle and update them make sure it will be passed to llamaProcess
+            // Return configured LLM
+            Ok(self.llm)
+        } else {
+            Err(ModelError::ProcessError("No state available".to_string()))
+        }
+    }
 }
 
 impl ModelManager {
@@ -279,9 +297,9 @@ impl ModelManager {
         self: Arc<Self>,
         model_name: &str,
         options: Option<LLMHTTPCallOptions>,
-        auto_load: bool // To pass a object struct with options how to handle memory loading ( AutoLoad, Unload after use etc.)
-    ) -> ModelResult<LLM> {
-        async fn with_state() {
+        auto_load: bool
+    ) -> ModelResult<LLMResult> {
+        pub async fn with_state() {
             info!("Command to start model with dynamic configuration: ");
             // ToDo: Implement the logic to start the model with dynamic configuration
         }
@@ -317,7 +335,6 @@ impl ModelManager {
             }
         }
 
-        let model_status = self.get_model_status(model_name).await;
         // info!("Current model status: {:?}", model_status);
         let state = ModelState::new(config.clone());
         // Only load the model immediately if auto_load is true
@@ -371,13 +388,15 @@ impl ModelManager {
 
         let processor = Self::get_processor_for_model(&config);
         // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
-        Ok(
-            LLM::builder()
+        Ok(LLMResult {
+            llm: LLM::builder()
                 .with_model_manager(self.clone(), model_name.to_string(), auto_load)
                 .with_options(llm_options)
                 .with_process_response(move |stream| processor(stream))
-                .build()
-        )
+                .build(),
+            state: Some(Arc::new(state)),
+            manager: self.clone(),
+        })
     }
 
     async fn manage_memory(&self, required_gb: f32) -> ModelResult<()> {
