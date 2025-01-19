@@ -1,4 +1,5 @@
-use std::error::Error as StdError;
+use std::{ collections::HashMap, error::Error as StdError };
+use axum::Json;
 use pyano::{ agent::agent_builder::AgentBuilder, chain::sequential_chain::Chain, ModelManager };
 use log::{ info, error };
 use std::sync::{ Arc, Mutex };
@@ -17,16 +18,17 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     info!("Loading SmolTalk model");
     let content_llm = model_manager
         .clone()
-        .get_or_create_llm("smolTalk", None, true).await
+        .get_or_create_llm("smolTalk", true).await
         .map_err(|e| {
             error!("Failed to load SmolTalk model: {}", e);
             e
         })?;
-
+    let mut state: HashMap<String, serde_json::Value> = HashMap::new();
+    state.insert("Port".to_string(), serde_json::json!(5010));
+    state.insert("Temprature".to_string(), serde_json::json!(0.8));
     let llama_llm = model_manager
         .clone()
-        .get_or_create_llm("granite", None, true).await?
-        .with_state()
+        .get_or_create_llm_with_state("granite", state, true).await
         .map_err(|e| {
             error!("Failed to load Granite model: {}", e);
             e
@@ -44,7 +46,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                     "Generate content on the topic - Future of AI agentix framework".to_string()
                 )
                 .with_stream(true)
-                .with_llm(content_llm.llm.clone())
+                .with_llm(content_llm.clone())
                 .build()
         )
     );
@@ -56,7 +58,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                 .with_system_prompt("You are a great analyzer of generated content.".to_string())
                 .with_user_prompt("Analyze the generated content.".to_string())
                 .with_stream(true)
-                .with_llm(llama_llm)
+                .with_llm(llama_llm.clone())
                 .build()
         )
     );

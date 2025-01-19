@@ -36,26 +36,6 @@ pub struct ModelManager {
     lock_in_progress: Arc<AtomicBool>,
     last_lock_holder: Arc<Mutex<Option<String>>>, // For debugging
 }
-pub struct LLMResult {
-    pub llm: LLM,
-    pub state: Option<Arc<ModelState>>,
-    manager: Arc<ModelManager>,
-}
-
-impl LLMResult {
-    pub fn with_state(self) -> ModelResult<LLM> {
-        // Access and configure state
-        if let Some(state) = self.state {
-            info!("Configuring LLM with dynamic state");
-            // Configure dynamic parameters
-            // pass optional parameters and handle and update them make sure it will be passed to llamaProcess
-            // Return configured LLM
-            Ok(self.llm)
-        } else {
-            Err(ModelError::ProcessError("No state available".to_string()))
-        }
-    }
-}
 
 impl ModelManager {
     pub fn new() -> Self {
@@ -296,13 +276,8 @@ impl ModelManager {
     pub async fn get_or_create_llm(
         self: Arc<Self>,
         model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
         auto_load: bool
-    ) -> ModelResult<LLMResult> {
-        pub async fn with_state() {
-            info!("Command to start model with dynamic configuration: ");
-            // ToDo: Implement the logic to start the model with dynamic configuration
-        }
+    ) -> ModelResult<LLM> {
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
@@ -369,34 +344,101 @@ impl ModelManager {
             }
         }
 
-        // Create LLM with model-specific configurations
-        let mut llm_options = options.unwrap_or_default();
-        llm_options = llm_options
-            .with_server_url(
-                format!(
-                    "http://{}:{}",
-                    config.server_config.host,
-                    config.server_config.port.unwrap_or(8000)
-                )
-            )
-            .with_prompt_template(config.prompt_template.template.clone());
+        let processor = Self::get_processor_for_model(&config);
+        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
+        Ok(
+            LLM::builder()
+                .with_model_manager(self.clone(), model_name.to_string(), auto_load)
+                .with_process_response(move |stream| processor(stream))
+                .build()
+        )
+    }
 
-        // Apply model defaults if not overridden
-        if llm_options.temperature.is_none() {
-            llm_options = llm_options.with_temperature(config.defaults.temperature);
+    pub async fn get_or_create_llm_with_state(
+        self: Arc<Self>,
+        model_name: &str,
+        state1: HashMap<String, serde_json::Value>,
+        auto_load: bool
+    ) -> ModelResult<LLM> {
+        let config = self.registry.get_config(model_name).ok_or_else(|| {
+            error!("Model configuration not found for: {}", model_name);
+            ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
+        })?;
+
+        let model_path = config.model_config.model_path.clone();
+        let model_path_str = model_path
+            .to_str()
+            .ok_or_else(|| {
+                ModelError::ProcessError("Failed to convert model path to string".to_string())
+            })?;
+        let model_home = get_env_var("MODEL_HOME").unwrap_or("pyano_home/models".to_string());
+        let model_full_path = std::path::Path
+            ::new(&format!("{}/{}", model_home, model_path_str))
+            .to_path_buf();
+        if model_full_path.exists() {
+            info!("Model {} is already present at {}", model_name, model_full_path.display());
+        } else {
+            warn!("Model {} is not present at {}", model_name, model_full_path.display());
+            let download_if_true: bool = config.model_config.download_if_not_exist;
+            if download_if_true {
+                info!("Downloading model {}", model_name);
+                download_model_files(
+                    config.model_config.model_url.as_deref().unwrap(),
+                    model_full_path.to_str().unwrap()
+                ).await.map_err(|e| ModelError::ProcessError(e.to_string()))?;
+                info!("Model {} downloaded successfully", model_name);
+            } else {
+                warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
+            }
+        }
+
+        // info!("Current model status: {:?}", model_status);
+        let state = ModelState::new(config.clone());
+
+        // Now update the state dynamic variables here
+        *state.port.lock().unwrap() = Some(5010);
+        state.show_state();
+        info!("State updated dynamically with port: 5010");
+        // Only load the model immediately if auto_load is true
+        if auto_load {
+            let model_status = self.get_model_status(model_name).await;
+            match model_status {
+                Ok(ModelStatus::Running) => {
+                    info!("Model {} is already running", model_name);
+                }
+                _ => {
+                    info!("Loading model: {}", model_name);
+                    self.load_model(state.clone()).await?;
+                    // Verify model was loaded successfully
+                    match self.get_model_status(model_name).await? {
+                        ModelStatus::Running => {
+                            info!("Model {} loaded successfully", model_name);
+                        }
+                        status => {
+                            error!("Model {} failed to load properly", model_name);
+                            return Err(
+                                ModelError::ProcessError(
+                                    format!(
+                                        "Failed to load model: {}. Status: {:?}",
+                                        model_name,
+                                        status
+                                    )
+                                )
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         let processor = Self::get_processor_for_model(&config);
         // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
-        Ok(LLMResult {
-            llm: LLM::builder()
+        Ok(
+            LLM::builder()
                 .with_model_manager(self.clone(), model_name.to_string(), auto_load)
-                .with_options(llm_options)
                 .with_process_response(move |stream| processor(stream))
-                .build(),
-            state: Some(Arc::new(state)),
-            manager: self.clone(),
-        })
+                .build()
+        )
     }
 
     async fn manage_memory(&self, required_gb: f32) -> ModelResult<()> {
