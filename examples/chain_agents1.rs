@@ -24,8 +24,9 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             e
         })?;
     let mut state: HashMap<String, serde_json::Value> = HashMap::new();
-    state.insert("Port".to_string(), serde_json::json!(5010));
-    state.insert("Temprature".to_string(), serde_json::json!(0.8));
+    state.insert("port".to_string(), serde_json::json!(5010));
+    state.insert("temprature".to_string(), serde_json::json!(0.8));
+    state.insert("top_k".to_string(), serde_json::json!(50));
     let llama_llm = model_manager
         .clone()
         .get_or_create_llm_with_state("granite", state, None, true).await

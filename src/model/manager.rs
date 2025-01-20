@@ -422,7 +422,7 @@ impl ModelManager {
                         *state.port.lock().unwrap() = Some(port as u16);
                     }
                 }
-                "temperature" => {
+                "temprature" => {
                     if let Some(temp) = value.as_f64() {
                         *state.temperature.lock().unwrap() = temp as f32;
                     }
