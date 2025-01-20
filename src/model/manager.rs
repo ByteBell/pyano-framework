@@ -375,7 +375,7 @@ impl ModelManager {
     pub async fn get_or_create_llm_with_state(
         self: Arc<Self>,
         model_name: &str,
-        state1: HashMap<String, serde_json::Value>,
+        updates: HashMap<String, serde_json::Value>,
         options: Option<LLMHTTPCallOptions>,
         auto_load: bool
     ) -> ModelResult<LLM> {
@@ -415,8 +415,54 @@ impl ModelManager {
         let state = ModelState::new(config.clone());
 
         // Now update the state dynamic variables here
-        *state.port.lock().unwrap() = Some(5010);
-        *state.temperature.lock().unwrap() = 0.8;
+        for (key, value) in updates.iter() {
+            match key.as_str() {
+                "port" => {
+                    if let Some(port) = value.as_u64() {
+                        *state.port.lock().unwrap() = Some(port as u16);
+                    }
+                }
+                "temperature" => {
+                    if let Some(temp) = value.as_f64() {
+                        *state.temperature.lock().unwrap() = temp as f32;
+                    }
+                }
+                "top_k" => {
+                    if let Some(top_k) = value.as_u64() {
+                        *state.top_k.lock().unwrap() = top_k as usize;
+                    }
+                }
+                "top_p" => {
+                    if let Some(top_p) = value.as_f64() {
+                        *state.top_p.lock().unwrap() = top_p as f32;
+                    }
+                }
+                "max_tokens" => {
+                    if let Some(max_tokens) = value.as_u64() {
+                        *state.max_tokens.lock().unwrap() = max_tokens as usize;
+                    }
+                }
+                "repetition_penalty" => {
+                    if let Some(repetition_penalty) = value.as_f64() {
+                        *state.repetition_penalty.lock().unwrap() = repetition_penalty as f32;
+                    }
+                }
+                "model_path" => {
+                    if let Some(model_path) = value.as_str() {
+                        *state.model_path.lock().unwrap() = std::path::PathBuf::from(model_path);
+                    }
+                }
+                "model_url" => {
+                    if let Some(model_url) = value.as_str() {
+                        *state.model_url.lock().unwrap() = Some(model_url.to_string());
+                    }
+                }
+                // Add more fields as needed
+                _ => {
+                    warn!("Unknown state update key: {}", key);
+                }
+            }
+        }
         state.show_state();
         info!("State updated dynamically with port: 5010");
         // Only load the model immediately if auto_load is true
