@@ -18,7 +18,7 @@ pub(crate) struct ModelProcess {
 impl ModelProcess {
     pub fn new(state: ModelState) -> Self {
         Self {
-            state: state,
+            state,
             child: None,
             shutdown_signal: None,
             model_process: None,
@@ -26,11 +26,12 @@ impl ModelProcess {
     }
 
     pub async fn start(&mut self) -> ModelResult<()> {
-        self.state = ModelState::new(self.state.config.clone());
+        self.state.show_state();
         if *self.state.status.lock().unwrap() == ModelStatus::Running {
             return Ok(());
         }
         info!("Starting model {}", self.state.config.model_config.name);
+        self.state.show_state();
         *self.state.status.lock().unwrap() = ModelStatus::Loading;
         self.model_process = Some(Box::new(LlamaProcess::new(self.state.clone())));
         self.model_process.as_mut().unwrap().getcmd().await;

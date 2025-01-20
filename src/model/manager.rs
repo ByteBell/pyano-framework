@@ -173,14 +173,14 @@ impl ModelManager {
                 return Err(ModelError::ProcessError("Timeout acquiring write lock".to_string()));
             }
         };
-
-        let mut process = ModelProcess::new(state.clone());
+        let lm_state = state.clone();
+        let mut process = ModelProcess::new(state);
         match process.start().await {
             Ok(_) => {
-                info!("Successfully started model process: {}", state.config.model_config.name);
-                models.insert(state.config.model_config.name.clone(), process);
+                info!("Successfully started model process: {}", lm_state.config.model_config.name);
+                models.insert(lm_state.config.model_config.name.clone(), process);
                 self.record_lock_event(
-                    &format!("Successfully loaded model {}", state.config.model_config.name)
+                    &format!("Successfully loaded model {}", lm_state.config.model_config.name)
                 );
                 Ok(())
             }
@@ -276,6 +276,7 @@ impl ModelManager {
     pub async fn get_or_create_llm(
         self: Arc<Self>,
         model_name: &str,
+        options: Option<LLMHTTPCallOptions>,
         auto_load: bool
     ) -> ModelResult<LLM> {
         let config = self.registry.get_config(model_name).ok_or_else(|| {
@@ -344,11 +345,28 @@ impl ModelManager {
             }
         }
 
+        let mut llm_options = options.unwrap_or_default();
+        llm_options = llm_options
+            .with_server_url(
+                format!(
+                    "http://{}:{}",
+                    config.server_config.host,
+                    config.server_config.port.unwrap_or(8000)
+                )
+            )
+            .with_prompt_template(config.prompt_template.template.clone());
+
+        // Apply model defaults if not overridden
+        if llm_options.temperature.is_none() {
+            llm_options = llm_options.with_temperature(config.defaults.temperature);
+        }
+
         let processor = Self::get_processor_for_model(&config);
         // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
         Ok(
             LLM::builder()
                 .with_model_manager(self.clone(), model_name.to_string(), auto_load)
+                .with_options(llm_options)
                 .with_process_response(move |stream| processor(stream))
                 .build()
         )
@@ -358,6 +376,7 @@ impl ModelManager {
         self: Arc<Self>,
         model_name: &str,
         state1: HashMap<String, serde_json::Value>,
+        options: Option<LLMHTTPCallOptions>,
         auto_load: bool
     ) -> ModelResult<LLM> {
         let config = self.registry.get_config(model_name).ok_or_else(|| {
@@ -397,6 +416,7 @@ impl ModelManager {
 
         // Now update the state dynamic variables here
         *state.port.lock().unwrap() = Some(5010);
+        *state.temperature.lock().unwrap() = 0.8;
         state.show_state();
         info!("State updated dynamically with port: 5010");
         // Only load the model immediately if auto_load is true
@@ -430,17 +450,33 @@ impl ModelManager {
                 }
             }
         }
+        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
+        let mut llm_options = options.unwrap_or_default();
+        llm_options = llm_options
+            .with_server_url(
+                format!(
+                    "http://{}:{}",
+                    config.server_config.host,
+                    config.server_config.port.unwrap_or(8000)
+                )
+            )
+            .with_prompt_template(config.prompt_template.template.clone());
+
+        // Apply model defaults if not overridden
+        if llm_options.temperature.is_none() {
+            llm_options = llm_options.with_temperature(config.defaults.temperature);
+        }
 
         let processor = Self::get_processor_for_model(&config);
         // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
         Ok(
             LLM::builder()
                 .with_model_manager(self.clone(), model_name.to_string(), auto_load)
+                .with_options(llm_options)
                 .with_process_response(move |stream| processor(stream))
                 .build()
         )
     }
-
     async fn manage_memory(&self, required_gb: f32) -> ModelResult<()> {
         info!("Starting memory management for {:.1} GB", required_gb);
 

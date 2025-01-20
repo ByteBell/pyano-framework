@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     info!("Loading SmolTalk model");
     let content_llm = model_manager
         .clone()
-        .get_or_create_llm("smolTalk", true).await
+        .get_or_create_llm("smolTalk", None, true).await
         .map_err(|e| {
             error!("Failed to load SmolTalk model: {}", e);
             e
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     state.insert("Temprature".to_string(), serde_json::json!(0.8));
     let llama_llm = model_manager
         .clone()
-        .get_or_create_llm_with_state("granite", state, true).await
+        .get_or_create_llm_with_state("granite", state, None, true).await
         .map_err(|e| {
             error!("Failed to load Granite model: {}", e);
             e
