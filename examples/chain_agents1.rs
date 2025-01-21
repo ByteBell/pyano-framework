@@ -16,24 +16,38 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     let model_manager = Arc::new(ModelManager::new());
     model_manager.show_registry(); // get_model_registry
     info!("Loading SmolTalk model");
-    let content_llm = model_manager
-        .clone()
-        .get_or_create_llm("smolTalk", None, true).await
-        .map_err(|e| {
-            error!("Failed to load SmolTalk model: {}", e);
-            e
-        })?;
-    let mut state: HashMap<String, serde_json::Value> = HashMap::new();
-    state.insert("port".to_string(), serde_json::json!(5010));
-    state.insert("temprature".to_string(), serde_json::json!(0.8));
-    state.insert("top_k".to_string(), serde_json::json!(50));
-    let llama_llm = model_manager
-        .clone()
-        .get_or_create_llm_with_state("granite", state, None, true).await
-        .map_err(|e| {
-            error!("Failed to load Granite model: {}", e);
-            e
-        })?;
+    let content_llm = Arc::new(
+        model_manager
+            .clone()
+            .get_llm("smolTalk", None).await
+            .map_err(|e| {
+                error!("Failed to Get SmolTalk model: {}", e);
+                e
+            })?
+    );
+
+    info!("Loading Granite model");
+    let clm = content_llm.load_llm().await.map_err(|e| {
+        error!("Failed to load Granite model: {}", e);
+        e
+    })?;
+
+    let llama_llm = Arc::new(
+        model_manager
+            .clone()
+            .get_llm("granite", None).await
+            .map_err(|e| {
+                error!("Failed to load Granite model: {}", e);
+                e
+            })?
+    );
+
+    info!("Loading Granite model");
+
+    let llm = llama_llm.load_llm().await.map_err(|e| {
+        error!("Failed to load Granite model: {}", e);
+        e
+    })?;
 
     model_manager.show_model_details().await;
 
@@ -47,7 +61,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                     "Generate content on the topic - Future of AI agentix framework".to_string()
                 )
                 .with_stream(true)
-                .with_llm(content_llm.clone())
+                .with_llm(clm.clone())
                 .build()
         )
     );
@@ -59,7 +73,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                 .with_system_prompt("You are a great analyzer of generated content.".to_string())
                 .with_user_prompt("Analyze the generated content.".to_string())
                 .with_stream(true)
-                .with_llm(llama_llm.clone())
+                .with_llm(llm.clone())
                 .build()
         )
     );
