@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use log::{ error, info, warn };
 use tokio::sync::RwLock;
-use super::state::ModelState;
+use super::state::{ self, ModelState };
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -80,7 +80,6 @@ impl LLMResult {
     async fn load_llm_internal(self: Arc<Self>, state: ModelState) -> ModelResult<LLM> {
         //To Do
         let config = state.config.clone();
-        let options = self.options.clone();
         let manager = self.manager.clone();
         let model_status = self.manager.get_model_status(&config.model_config.name).await;
         match model_status {
@@ -111,15 +110,9 @@ impl LLMResult {
             }
         }
 
-        let mut llm_options = options.unwrap_or_default();
+        let mut llm_options = self.options.clone().unwrap();
         llm_options = llm_options
-            .with_server_url(
-                format!(
-                    "http://{}:{}",
-                    config.server_config.host,
-                    config.server_config.port.unwrap_or(8000)
-                )
-            )
+            .with_port(state.port.lock().unwrap().unwrap_or(52555) as u16)
             .with_prompt_template(config.prompt_template.template.clone());
 
         // Apply model defaults if not overridden
@@ -411,24 +404,51 @@ impl ModelManager {
                 warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
             }
         }
+        let state = ModelState::new(config.clone());
+
+        if options.is_none() {
+            info!("Options are None");
+        } else {
+            info!("Options are not None");
+            info!("Updating states based of the options");
+            // Print what are the options passed
+
+            if let Some(ref opts) = options {
+                info!("Options passed:");
+                info!("Updating state on the basis of the values passed.");
+
+                if !opts.temperature.is_none() {
+                    *state.temperature.lock().unwrap() = opts.temperature.unwrap();
+                }
+                if !opts.top_k.is_none() {
+                    *state.top_k.lock().unwrap() = opts.top_k.unwrap();
+                }
+                if !opts.top_p.is_none() {
+                    *state.top_p.lock().unwrap() = opts.top_p.unwrap();
+                }
+                if !opts.max_tokens.is_none() {
+                    *state.max_tokens.lock().unwrap() = opts.max_tokens.unwrap();
+                }
+                if !opts.repetition_penalty.is_none() {
+                    *state.repetition_penalty.lock().unwrap() = opts.repetition_penalty.unwrap();
+                }
+                if !opts.port.is_none() {
+                    *state.port.lock().unwrap() = opts.port.clone();
+                }
+                info!("State has bee Updated");
+            }
+        }
         let mut llm_options = options.unwrap_or_default();
         llm_options = llm_options
-            .with_server_url(
-                format!(
-                    "http://{}:{}",
-                    config.server_config.host,
-                    config.server_config.port.unwrap_or(8000)
-                )
-            )
+            .with_port(config.server_config.port.unwrap_or(52555) as u16)
             .with_prompt_template(config.prompt_template.template.clone());
 
         // Apply model defaults if not overridden
         if llm_options.temperature.is_none() {
             llm_options = llm_options.with_temperature(config.defaults.temperature);
         }
-
+        //ToDo update state with the values present in the llm_options
         // info!("Current model status: {:?}", model_status);
-        let state = ModelState::new(config.clone());
         // Intiate a model state donot connect with Model Process but do not start yet
         Ok(LLMResult {
             manager: self.clone(),
