@@ -7,7 +7,7 @@ use super::types::{ ModelConfig, ModelInfo, ModelStatus };
 use super::error::ModelResult;
 use crate::llm::llm_builder::LLM;
 use super::state::ModelState;
-use super::manager::LLMResult;
+use super::manager::ModelRequest;
 use crate::llm::options::LLMHTTPCallOptions;
 use crate::llm::stream_processing::{ llamacpp_process_stream, qwen_process_stream };
 
@@ -66,7 +66,7 @@ impl ModelManagerInterface for ModelManagerClient {
         &self,
         model_name: &str,
         options: Option<LLMHTTPCallOptions>
-    ) -> ModelResult<LLMResult> {
+    ) -> ModelResult<ModelRequest> {
         // todo add this to server
         // First ensure the model is loaded
         match self.get_model_status(model_name).await {
@@ -114,6 +114,6 @@ impl ModelManagerInterface for ModelManagerClient {
             _ => llamacpp_process_stream, // default
         };
 
-        Ok(LLMResult::default())
+        Ok(ModelRequest::default())
     }
 }

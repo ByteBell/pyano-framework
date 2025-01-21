@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use crate::llm::llm_builder::LLM;
 use super::state::ModelState;
 use crate::llm::options::LLMHTTPCallOptions;
-use super::manager::LLMResult;
+use super::manager::ModelRequest;
 use super::types::{ ModelConfig, ModelInfo, ModelStatus };
 use super::error::ModelResult;
 
@@ -16,6 +16,6 @@ pub trait ModelManagerInterface: Send + Sync {
         &self,
         model_name: &str,
         options: Option<LLMHTTPCallOptions>
-    ) -> ModelResult<LLMResult>;
+    ) -> ModelResult<ModelRequest>;
     async fn load_model_by_name(&self, name: &str) -> ModelResult<()>;
 }
