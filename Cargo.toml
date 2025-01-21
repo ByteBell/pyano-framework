@@ -39,6 +39,7 @@ tch = { version = "0.17.0", features = ["download-libtorch"] }
 sqlx = { version = "0.8.2", default-features = false, features = ["postgres", "sqlite", "runtime-tokio-native-tls", "json", "uuid"], optional = true }
 sqlite-vec = "0.1.2"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
+async-openai = "0.27.0"
 [dev-dependencies]
 tokio-test = "0.4"
 
