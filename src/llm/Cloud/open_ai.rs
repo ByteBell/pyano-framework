@@ -13,8 +13,8 @@ use async_openai::{
 };
 
 pub struct OpenAIClient {
-    client: Client<OpenAIConfig>,
-    request: CreateChatCompletionRequest,
+    pub client: Client<OpenAIConfig>,
+    pub request: CreateChatCompletionRequest,
 }
 
 impl OpenAIClient {
@@ -25,10 +25,7 @@ impl OpenAIClient {
         }
     }
 
-    pub async fn build(
-        self,
-        key: String
-    ) -> Result<OpenAIClient, async_openai::error::OpenAIError> {
+    pub async fn build(self) -> Result<OpenAIClient, async_openai::error::OpenAIError> {
         let client = Client::new();
 
         // Above is shortcut for
@@ -36,8 +33,7 @@ impl OpenAIClient {
         let client = Client::with_config(config);
 
         // OR use API key from different source and a non default organization
-        let api_key = key;
-        let config = OpenAIConfig::new().with_api_key(api_key).with_org_id("the-continental");
+        let config = OpenAIConfig::new().with_org_id("the-continental");
 
         let client = Client::with_config(config);
 
