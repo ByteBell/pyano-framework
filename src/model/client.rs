@@ -8,6 +8,7 @@ use super::error::ModelResult;
 use crate::llm::llm_builder::LLM;
 use crate::llm::options::LLMHTTPCallOptions;
 use crate::llm::stream_processing::{ llamacpp_process_stream, qwen_process_stream };
+use super::state::ModelState;
 
 pub struct ModelManagerClient {
     base_url: String,
@@ -60,12 +61,9 @@ impl ModelManagerInterface for ModelManagerClient {
         Ok(response.json().await?)
     }
 
-    async fn get_or_create_llm(
-        &self,
-        model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
-        auto_load: bool
-    ) -> ModelResult<LLM> {
+    async fn get_or_create_llm(&self, model_name: &str, auto_load: bool) -> ModelResult<LLM> {
+        let options: Option<LLMHTTPCallOptions> = None;
+
         // todo add this to server
         // First ensure the model is loaded
         match self.get_model_status(model_name).await {
@@ -114,5 +112,15 @@ impl ModelManagerInterface for ModelManagerClient {
         };
 
         Ok(LLM::builder().with_options(llm_options).with_process_response(processor).build())
+    }
+
+    async fn get_or_create_llm_with_state(
+        &self,
+        model_name: &str,
+        state: ModelState,
+        auto_load: bool
+    ) -> ModelResult<LLM> {
+        // todo
+        Ok(LLM::builder().build())
     }
 }

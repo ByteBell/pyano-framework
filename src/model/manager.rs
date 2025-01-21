@@ -276,9 +276,10 @@ impl ModelManager {
     pub async fn get_or_create_llm(
         self: Arc<Self>,
         model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
         auto_load: bool
     ) -> ModelResult<LLM> {
+        let options: Option<LLMHTTPCallOptions> = None;
+
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
@@ -376,9 +377,9 @@ impl ModelManager {
         self: Arc<Self>,
         model_name: &str,
         updates: HashMap<String, serde_json::Value>,
-        options: Option<LLMHTTPCallOptions>,
         auto_load: bool
     ) -> ModelResult<LLM> {
+        let options: Option<LLMHTTPCallOptions> = None;
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
@@ -704,15 +705,20 @@ impl ModelManagerInterface for ModelManager {
         self.list_models().await
     }
 
-    async fn get_or_create_llm(
+    async fn get_or_create_llm(&self, model_name: &str, auto_load: bool) -> ModelResult<LLM> {
+        // Existing implementation
+        self.get_or_create_llm(model_name, auto_load).await
+    }
+    async fn get_or_create_llm_with_state(
         &self,
         model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
+        state: ModelState,
         auto_load: bool
     ) -> ModelResult<LLM> {
         // Existing implementation
-        self.get_or_create_llm(model_name, options, auto_load).await
+        self.get_or_create_llm_with_state(model_name, state, auto_load).await
     }
+
     async fn load_model_by_name(&self, name: &str) -> ModelResult<()> {
         self.load_model_by_name(name).await
     }
