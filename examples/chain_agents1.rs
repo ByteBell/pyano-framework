@@ -1,6 +1,11 @@
 use std::{ collections::HashMap, error::Error as StdError };
 use axum::Json;
-use pyano::{ agent::agent_builder::AgentBuilder, chain::sequential_chain::Chain, ModelManager };
+use pyano::{
+    llm::options::LLMHTTPCallOptions,
+    agent::agent_builder::AgentBuilder,
+    chain::sequential_chain::Chain,
+    ModelManager,
+};
 use log::{ info, error };
 use std::sync::{ Arc, Mutex };
 
@@ -15,25 +20,55 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     info!("Initializing ModelManager");
     let model_manager = Arc::new(ModelManager::new());
     model_manager.show_registry(); // get_model_registry
+    info!("Gettig SmolTalk model");
+    let content_llm_request = Arc::new(
+        model_manager
+            .clone()
+            .get_llm("smolTalk", None).await
+            .map_err(|e| {
+                error!("Failed to Get SmolTalk model: {}", e);
+                e
+            })?
+    );
+
     info!("Loading SmolTalk model");
-    let content_llm = model_manager
-        .clone()
-        .get_or_create_llm("smolTalk", None, true).await
-        .map_err(|e| {
-            error!("Failed to load SmolTalk model: {}", e);
-            e
-        })?;
-    let mut state: HashMap<String, serde_json::Value> = HashMap::new();
-    state.insert("port".to_string(), serde_json::json!(5010));
-    state.insert("temprature".to_string(), serde_json::json!(0.8));
-    state.insert("top_k".to_string(), serde_json::json!(50));
-    let llama_llm = model_manager
-        .clone()
-        .get_or_create_llm_with_state("granite", state, None, true).await
-        .map_err(|e| {
-            error!("Failed to load Granite model: {}", e);
-            e
-        })?;
+    let content_llm = content_llm_request.load_llm().await.map_err(|e| {
+        error!("Failed to load Granite model: {}", e);
+        e
+    })?;
+
+    let prompt_template =
+        "
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+            Cutting Knowledge Date: December 2023
+            Today Date: 26 Jul 2024
+        {system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+        {user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    ";
+
+    let options = LLMHTTPCallOptions::new()
+        .with_port(5010)
+        .with_prompt_template(prompt_template.to_string())
+        .with_temperature(0.8)
+        .build();
+
+    info!("Gettig Granite model");
+    let llama_llm_request = Arc::new(
+        model_manager
+            .clone()
+            .get_llm("granite", Some(options)).await
+            .map_err(|e| {
+                error!("Failed to load Granite model: {}", e);
+                e
+            })?
+    );
+
+    info!("Loading Granite model");
+
+    let llama_llm = llama_llm_request.load_llm().await.map_err(|e| {
+        error!("Failed to load Granite model: {}", e);
+        e
+    })?;
 
     model_manager.show_model_details().await;
 

@@ -38,7 +38,7 @@ impl LLM {
         system_prompt: &str,
         stream: bool
     ) -> Result<reqwest::Response, Box<dyn StdError + Send + Sync + 'static>> {
-        let server_url = self.options.server_url.as_ref().expect("Server URL is missing");
+        let server_url = self.options.port.as_ref().expect("Server URL is missing");
 
         let prompt_template = self.options.prompt_template
             .as_ref()

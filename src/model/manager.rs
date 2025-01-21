@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use log::{ error, info, warn };
 use tokio::sync::RwLock;
-use super::state::ModelState;
+use super::state::{ self, ModelState };
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,6 +15,7 @@ use super::process::ModelProcess;
 use super::config_loader::ModelRegistry;
 use super::error::{ ModelError, ModelResult };
 use super::{ ModelConfig, ModelInfo, ModelStatus, ModelType, SystemMemory };
+use crate::llm;
 use crate::llm::llm_builder::LLM;
 use crate::llm::options::LLMHTTPCallOptions;
 use crate::llm::stream_processing::llamacpp_process_stream;
@@ -35,6 +36,100 @@ pub struct ModelManager {
 
     lock_in_progress: Arc<AtomicBool>,
     last_lock_holder: Arc<Mutex<Option<String>>>, // For debugging
+}
+
+pub struct ModelRequest {
+    pub manager: Arc<dyn ModelManagerInterface>,
+    pub options: Option<LLMHTTPCallOptions>,
+    pub state: Option<ModelState>,
+    pub config: Option<ModelConfig>,
+}
+
+impl ModelRequest {
+    pub fn new(
+        manager: Arc<dyn ModelManagerInterface>,
+        options: Option<LLMHTTPCallOptions>,
+        state: Option<ModelState>,
+        config: Option<ModelConfig>
+    ) -> Self {
+        Self {
+            state,
+            config,
+            manager,
+            options,
+        }
+    }
+
+    pub fn default() -> Self {
+        Self {
+            state: None,
+            config: None,
+            manager: Arc::new(ModelManager::new()),
+            options: None,
+        }
+    }
+
+    pub async fn load_llm(self: Arc<Self>) -> ModelResult<LLM> {
+        if let Some(state) = self.state.clone() {
+            Box::pin(self.load_llm_internal(state)).await
+        } else {
+            Err(ModelError::ProcessError("ModelState is None".to_string()))
+        }
+    }
+
+    async fn load_llm_internal(self: Arc<Self>, state: ModelState) -> ModelResult<LLM> {
+        //To Do
+        let config = state.config.clone();
+        let manager = self.manager.clone();
+        let model_status = self.manager.get_model_status(&config.model_config.name).await;
+        match model_status {
+            Ok(ModelStatus::Running) => {
+                info!("Model {} is already running", config.model_config.name);
+            }
+            _ => {
+                info!("Loading model: {}", config.model_config.name);
+                self.manager.load_model(state.clone()).await?;
+                // Verify model was loaded successfully
+                match manager.get_model_status(&config.model_config.name).await? {
+                    ModelStatus::Running => {
+                        info!("Model {} loaded successfully", config.model_config.name);
+                    }
+                    status => {
+                        error!("Model {} failed to load properly", config.model_config.name);
+                        return Err(
+                            ModelError::ProcessError(
+                                format!(
+                                    "Failed to load model: {}. Status: {:?}",
+                                    config.model_config.name,
+                                    status
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+        }
+
+        let mut llm_options = self.options.clone().unwrap();
+        llm_options = llm_options
+            .with_port(state.port.lock().unwrap().unwrap_or(52555) as u16)
+            .with_prompt_template(config.prompt_template.template.clone());
+
+        // Apply model defaults if not overridden
+        if llm_options.temperature.is_none() {
+            llm_options = llm_options.with_temperature(config.defaults.temperature);
+        }
+
+        let processor = ModelManager::get_processor_for_model(&config);
+        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
+        Ok(
+            LLM::builder()
+                .with_model_manager(manager.clone(), config.model_config.name.to_string(), true)
+                .with_options(llm_options)
+                .with_process_response(move |stream| processor(stream))
+                .build()
+        )
+    }
 }
 
 impl ModelManager {
@@ -272,18 +367,17 @@ impl ModelManager {
                 }),
         }
     }
+    //cretae a get_llm() & load_llm() methods
 
-    pub async fn get_or_create_llm(
+    pub async fn get_llm(
         self: Arc<Self>,
         model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
-        auto_load: bool
-    ) -> ModelResult<LLM> {
+        options: Option<LLMHTTPCallOptions>
+    ) -> ModelResult<ModelRequest> {
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
         })?;
-
         let model_path = config.model_config.model_path.clone();
         let model_path_str = model_path
             .to_str()
@@ -310,219 +404,60 @@ impl ModelManager {
                 warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
             }
         }
-
-        // info!("Current model status: {:?}", model_status);
         let state = ModelState::new(config.clone());
-        // Only load the model immediately if auto_load is true
-        if auto_load {
-            let model_status = self.get_model_status(model_name).await;
-            match model_status {
-                Ok(ModelStatus::Running) => {
-                    info!("Model {} is already running", model_name);
-                }
-                _ => {
-                    info!("Loading model: {}", model_name);
-                    self.load_model(state.clone()).await?;
-                    // Verify model was loaded successfully
-                    match self.get_model_status(model_name).await? {
-                        ModelStatus::Running => {
-                            info!("Model {} loaded successfully", model_name);
-                        }
-                        status => {
-                            error!("Model {} failed to load properly", model_name);
-                            return Err(
-                                ModelError::ProcessError(
-                                    format!(
-                                        "Failed to load model: {}. Status: {:?}",
-                                        model_name,
-                                        status
-                                    )
-                                )
-                            );
-                        }
-                    }
-                }
-            }
-        }
 
-        let mut llm_options = options.unwrap_or_default();
-        llm_options = llm_options
-            .with_server_url(
-                format!(
-                    "http://{}:{}",
-                    config.server_config.host,
-                    config.server_config.port.unwrap_or(8000)
-                )
-            )
-            .with_prompt_template(config.prompt_template.template.clone());
-
-        // Apply model defaults if not overridden
-        if llm_options.temperature.is_none() {
-            llm_options = llm_options.with_temperature(config.defaults.temperature);
-        }
-
-        let processor = Self::get_processor_for_model(&config);
-        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
-        Ok(
-            LLM::builder()
-                .with_model_manager(self.clone(), model_name.to_string(), auto_load)
-                .with_options(llm_options)
-                .with_process_response(move |stream| processor(stream))
-                .build()
-        )
-    }
-
-    pub async fn get_or_create_llm_with_state(
-        self: Arc<Self>,
-        model_name: &str,
-        updates: HashMap<String, serde_json::Value>,
-        options: Option<LLMHTTPCallOptions>,
-        auto_load: bool
-    ) -> ModelResult<LLM> {
-        let config = self.registry.get_config(model_name).ok_or_else(|| {
-            error!("Model configuration not found for: {}", model_name);
-            ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
-        })?;
-
-        let model_path = config.model_config.model_path.clone();
-        let model_path_str = model_path
-            .to_str()
-            .ok_or_else(|| {
-                ModelError::ProcessError("Failed to convert model path to string".to_string())
-            })?;
-        let model_home = get_env_var("MODEL_HOME").unwrap_or("pyano_home/models".to_string());
-        let model_full_path = std::path::Path
-            ::new(&format!("{}/{}", model_home, model_path_str))
-            .to_path_buf();
-        if model_full_path.exists() {
-            info!("Model {} is already present at {}", model_name, model_full_path.display());
+        if options.is_none() {
+            info!("Options are None");
         } else {
-            warn!("Model {} is not present at {}", model_name, model_full_path.display());
-            let download_if_true: bool = config.model_config.download_if_not_exist;
-            if download_if_true {
-                info!("Downloading model {}", model_name);
-                download_model_files(
-                    config.model_config.model_url.as_deref().unwrap(),
-                    model_full_path.to_str().unwrap()
-                ).await.map_err(|e| ModelError::ProcessError(e.to_string()))?;
-                info!("Model {} downloaded successfully", model_name);
-            } else {
-                warn!("Model {} is not present at the location and download_if_not_present is set to false", model_name);
-            }
-        }
+            info!("Options are not None");
+            info!("Updating states based of the options");
+            // Print what are the options passed
 
-        // info!("Current model status: {:?}", model_status);
-        let state = ModelState::new(config.clone());
+            if let Some(ref opts) = options {
+                info!("Options passed:");
+                info!("Updating state on the basis of the values passed.");
 
-        // Now update the state dynamic variables here
-        for (key, value) in updates.iter() {
-            match key.as_str() {
-                "port" => {
-                    if let Some(port) = value.as_u64() {
-                        *state.port.lock().unwrap() = Some(port as u16);
-                    }
+                if !opts.temperature.is_none() {
+                    *state.temperature.lock().unwrap() = opts.temperature.unwrap();
                 }
-                "temprature" => {
-                    if let Some(temp) = value.as_f64() {
-                        *state.temperature.lock().unwrap() = temp as f32;
-                    }
+                if !opts.top_k.is_none() {
+                    *state.top_k.lock().unwrap() = opts.top_k.unwrap();
                 }
-                "top_k" => {
-                    if let Some(top_k) = value.as_u64() {
-                        *state.top_k.lock().unwrap() = top_k as usize;
-                    }
+                if !opts.top_p.is_none() {
+                    *state.top_p.lock().unwrap() = opts.top_p.unwrap();
                 }
-                "top_p" => {
-                    if let Some(top_p) = value.as_f64() {
-                        *state.top_p.lock().unwrap() = top_p as f32;
-                    }
+                if !opts.max_tokens.is_none() {
+                    *state.max_tokens.lock().unwrap() = opts.max_tokens.unwrap();
                 }
-                "max_tokens" => {
-                    if let Some(max_tokens) = value.as_u64() {
-                        *state.max_tokens.lock().unwrap() = max_tokens as usize;
-                    }
+                if !opts.repetition_penalty.is_none() {
+                    *state.repetition_penalty.lock().unwrap() = opts.repetition_penalty.unwrap();
                 }
-                "repetition_penalty" => {
-                    if let Some(repetition_penalty) = value.as_f64() {
-                        *state.repetition_penalty.lock().unwrap() = repetition_penalty as f32;
-                    }
+                if !opts.port.is_none() {
+                    *state.port.lock().unwrap() = opts.port.clone();
                 }
-                "model_path" => {
-                    if let Some(model_path) = value.as_str() {
-                        *state.model_path.lock().unwrap() = std::path::PathBuf::from(model_path);
-                    }
-                }
-                "model_url" => {
-                    if let Some(model_url) = value.as_str() {
-                        *state.model_url.lock().unwrap() = Some(model_url.to_string());
-                    }
-                }
-                // Add more fields as needed
-                _ => {
-                    warn!("Unknown state update key: {}", key);
-                }
+                info!("State has bee Updated");
             }
         }
-        state.show_state();
-        info!("State updated dynamically with port: 5010");
-        // Only load the model immediately if auto_load is true
-        if auto_load {
-            let model_status = self.get_model_status(model_name).await;
-            match model_status {
-                Ok(ModelStatus::Running) => {
-                    info!("Model {} is already running", model_name);
-                }
-                _ => {
-                    info!("Loading model: {}", model_name);
-                    self.load_model(state.clone()).await?;
-                    // Verify model was loaded successfully
-                    match self.get_model_status(model_name).await? {
-                        ModelStatus::Running => {
-                            info!("Model {} loaded successfully", model_name);
-                        }
-                        status => {
-                            error!("Model {} failed to load properly", model_name);
-                            return Err(
-                                ModelError::ProcessError(
-                                    format!(
-                                        "Failed to load model: {}. Status: {:?}",
-                                        model_name,
-                                        status
-                                    )
-                                )
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
         let mut llm_options = options.unwrap_or_default();
         llm_options = llm_options
-            .with_server_url(
-                format!(
-                    "http://{}:{}",
-                    config.server_config.host,
-                    config.server_config.port.unwrap_or(8000)
-                )
-            )
+            .with_port(config.server_config.port.unwrap_or(52555) as u16)
             .with_prompt_template(config.prompt_template.template.clone());
 
         // Apply model defaults if not overridden
         if llm_options.temperature.is_none() {
             llm_options = llm_options.with_temperature(config.defaults.temperature);
         }
-
-        let processor = Self::get_processor_for_model(&config);
-        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
-        Ok(
-            LLM::builder()
-                .with_model_manager(self.clone(), model_name.to_string(), auto_load)
-                .with_options(llm_options)
-                .with_process_response(move |stream| processor(stream))
-                .build()
-        )
+        //ToDo update state with the values present in the llm_options
+        // info!("Current model status: {:?}", model_status);
+        // Intiate a model state donot connect with Model Process but do not start yet
+        Ok(ModelRequest {
+            manager: self.clone(),
+            options: Some(llm_options),
+            state: Some(state),
+            config: Some(config.clone()),
+        })
     }
+
     async fn manage_memory(&self, required_gb: f32) -> ModelResult<()> {
         info!("Starting memory management for {:.1} GB", required_gb);
 
@@ -682,10 +617,9 @@ impl ModelManager {
 
 #[async_trait]
 impl ModelManagerInterface for ModelManager {
-    async fn load_model(&self, config: ModelConfig) -> ModelResult<()> {
+    async fn load_model(&self, state: ModelState) -> ModelResult<()> {
         // Existing implementation
         // ToDO need some clarity here
-        let state = ModelState::new(config.clone());
         self.load_model(state).await
     }
 
@@ -704,15 +638,15 @@ impl ModelManagerInterface for ModelManager {
         self.list_models().await
     }
 
-    async fn get_or_create_llm(
+    async fn get_llm(
         &self,
         model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
-        auto_load: bool
-    ) -> ModelResult<LLM> {
+        options: Option<LLMHTTPCallOptions>
+    ) -> ModelResult<ModelRequest> {
         // Existing implementation
-        self.get_or_create_llm(model_name, options, auto_load).await
+        self.get_llm(model_name, options).await
     }
+
     async fn load_model_by_name(&self, name: &str) -> ModelResult<()> {
         self.load_model_by_name(name).await
     }
