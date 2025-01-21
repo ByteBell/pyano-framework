@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     let model_manager = Arc::new(ModelManager::new());
     model_manager.show_registry(); // get_model_registry
     info!("Gettig SmolTalk model");
-    let content_llm = Arc::new(
+    let content_llm_request = Arc::new(
         model_manager
             .clone()
             .get_llm("smolTalk", None).await
@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     );
 
     info!("Loading SmolTalk model");
-    let clm = content_llm.load_llm().await.map_err(|e| {
+    let content_llm = content_llm_request.load_llm().await.map_err(|e| {
         error!("Failed to load Granite model: {}", e);
         e
     })?;
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
         .build();
 
     info!("Gettig Granite model");
-    let llama_llm = Arc::new(
+    let llama_llm_request = Arc::new(
         model_manager
             .clone()
             .get_llm("granite", Some(options)).await
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     info!("Loading Granite model");
 
-    let llm = llama_llm.load_llm().await.map_err(|e| {
+    let llama_llm = llama_llm_request.load_llm().await.map_err(|e| {
         error!("Failed to load Granite model: {}", e);
         e
     })?;
@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                     "Generate content on the topic - Future of AI agentix framework".to_string()
                 )
                 .with_stream(true)
-                .with_llm(clm.clone())
+                .with_llm(content_llm.clone())
                 .build()
         )
     );
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                 .with_system_prompt("You are a great analyzer of generated content.".to_string())
                 .with_user_prompt("Analyze the generated content.".to_string())
                 .with_stream(true)
-                .with_llm(llm.clone())
+                .with_llm(llama_llm.clone())
                 .build()
         )
     );
