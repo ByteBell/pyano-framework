@@ -1,16 +1,10 @@
-use std::fmt::format;
-use std::{ collections::HashMap, error::Error as StdError };
-use axum::Json;
-use pyano::{
-    llm::options::LLMHTTPCallOptions,
-    agent::agent_builder::AgentBuilder,
-    chain::sequential_chain::Chain,
-    ModelManager,
-};
+use std::{ error::Error as StdError };
+use pyano::{ agent::agent_builder::AgentBuilder, chain::sequential_chain::Chain, ModelManager };
 use log::{ info, error };
 use std::sync::{ Arc, Mutex };
-use pdf::file::File as PdfFile;
-use pdf::object::Resolve;
+
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn StdError>> {
@@ -34,7 +28,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     let novice_llm = model_manager
         .clone()
-        .get_llm("Qwen2.5-1.5B", None).await
+        .get_llm("granite", None).await
         .map_err(|e| {
             error!("Failed to Get Qwen model: {}", e);
             e
@@ -42,11 +36,11 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     novice_llm.clone().load().await;
 
-    let pdf_path = "/home/deadbytes/Downloads/DeepSeek_R1.pdf";
-    let paper_content = std::fs::read_to_string(pdf_path).map_err(|e| {
-        error!("Failed to read PDF file: {}", e);
-        Box::new(e) as Box<dyn std::error::Error>
-    })?;
+    let mut file = File::open(
+        "/home/deadbytes/Documents/Pyano/pyano-framework/examples/DeepSeek_R1.txt"
+    ).await?;
+    let mut paper_content = String::new();
+    file.read_to_string(&mut paper_content).await?;
 
     let answer = Arc::new(
         Mutex::new(
@@ -67,9 +61,9 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             AgentBuilder::new()
                 .with_name(String::from("Novice Agent"))
                 .with_system_prompt(
-                    format!("You ask very ntellectual questions about serious topics but also like to goof around a little. Please Ask Questions based on the base of the followng paper \n {} \n you will get replies and based on that replies keep asking questions also you can generate new questions to start a new conversation ", paper_content).to_string()
+                    format!("You ask very intellectual questions about serious topics but also like to goof around a little. Please Ask Questions based on the base of the followng paper \n {} \n you will get replies and based on that replies keep asking questions also you can generate new questions to start a new conversation ", paper_content).to_string()
                 )
-                .with_user_prompt("Analyze the generated content.".to_string())
+                .with_user_prompt("Generate a Question. based on paper in english".to_string())
                 .with_stream(true)
                 .with_llm(novice_llm)
                 .build()
