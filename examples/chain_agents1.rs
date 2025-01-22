@@ -43,6 +43,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     ";
 
     let options = LLMHTTPCallOptions::new()
+        .with_server_url("http://localhost:5010".to_string()) // Add complete server URL
         .with_port(5010)
         .with_temperature(0.8)
         .with_prompt_template(prompt_template.to_string())
@@ -60,7 +61,6 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     info!("Loading Granite model");
     llama_llm.clone().load().await;
-    info!("Granite Model loaded");
     // Create agents
     let agent_1 = Arc::new(
         Mutex::new(
@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                     "Generate content on the topic - Future of AI agentix framework".to_string()
                 )
                 .with_stream(true)
-                .with_llm(content_llm.clone())
+                .with_llm(content_llm)
                 .build()
         )
     );
@@ -83,13 +83,12 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                 .with_system_prompt("You are a great analyzer of generated content.".to_string())
                 .with_user_prompt("Analyze the generated content.".to_string())
                 .with_stream(true)
-                .with_llm(llama_llm.clone())
+                .with_llm(llama_llm)
                 .build()
         )
     );
     // Create a chain and add agents
     let mut chain = Chain::new().add_agent(agent_1).add_agent(agent_2);
-    model_manager.show_model_details().await;
     // Run the chain
     if let Err(e) = chain.run().await {
         eprintln!("Error executing chain: {}", e);
@@ -107,7 +106,5 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             log.timestamp
         );
     }
-    model_manager.show_model_details().await;
-
     Ok(())
 }

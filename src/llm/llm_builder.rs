@@ -67,7 +67,7 @@ impl LLM {
         system_prompt: &str,
         stream: bool
     ) -> Result<reqwest::Response, Box<dyn StdError + Send + Sync + 'static>> {
-        let server_url = self.options.port.as_ref().expect("Server URL is missing");
+        let server_url = self.state.server_url.as_ref();
 
         let prompt_template = self.options.prompt_template
             .as_ref()
@@ -128,7 +128,7 @@ impl LLM {
         }
 
         let resp = self.client
-            .post(&format!("{}/completion", server_url))
+            .post(&format!("{}/completion", server_url.lock().unwrap().as_ref().unwrap()))
             .json(&serde_json::Value::Object(json_payload))
             .send().await
             .map_err(|e| LLMError::RequestFailed(e.to_string()))?

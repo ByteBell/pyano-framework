@@ -339,6 +339,9 @@ impl ModelManager {
                 }
                 if !opts.port.is_none() {
                     *state.port.lock().unwrap() = opts.port.clone();
+                    *state.server_url.lock().unwrap() = Some(
+                        format!("http://localhost:{}", opts.port.unwrap())
+                    );
                 }
                 info!("State has beem Updated");
             }
