@@ -298,13 +298,18 @@ impl ModelManager {
         if model_full_path.exists() {
             info!("Model {} is already present at {}", model_name, model_full_path.display());
         } else {
+            let model_path_parts: Vec<&str> = model_path_str.split('/').collect();
+            let download_path = model_path_parts.get(0).unwrap_or(&"");
+            let model_save_path = std::path::Path
+                ::new(&format!("{}/{}", model_home, download_path))
+                .to_path_buf();
             warn!("Model {} is not present at {}", model_name, model_full_path.display());
             let download_if_true: bool = config.model_config.download_if_not_exist;
             if download_if_true {
                 info!("Downloading model {}", model_name);
                 download_model_files(
                     config.model_config.model_url.as_deref().unwrap(),
-                    model_full_path.to_str().unwrap()
+                    model_save_path.to_str().unwrap()
                 ).await.map_err(|e| ModelError::ProcessError(e.to_string()))?;
                 info!("Model {} downloaded successfully", model_name);
             } else {
