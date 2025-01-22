@@ -36,9 +36,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     novice_llm.clone().load().await;
 
-    let mut file = File::open(
-        "/home/deadbytes/Documents/Pyano/pyano-framework/examples/DeepSeek_R1.txt"
-    ).await?;
+    let mut file = File::open("examples/DeepSeek_R1.txt").await?;
     let mut paper_content = String::new();
     file.read_to_string(&mut paper_content).await?;
 
