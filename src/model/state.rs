@@ -28,9 +28,34 @@ pub struct ModelState {
     pub status: Arc<Mutex<ModelStatus>>,
     pub last_used: Arc<Mutex<DateTime<Utc>>>,
     pub port: Arc<Mutex<Option<u16>>>,
+    pub server_url: Arc<Mutex<Option<String>>>,
 
     // Process management
     pub process_id: Arc<Mutex<Option<u32>>>,
+}
+
+impl Default for ModelState {
+    // implement default please
+    fn default() -> Self {
+        Self {
+            config: ModelConfig::default(),
+            model_path: Arc::new(Mutex::new(PathBuf::new())),
+            model_url: Arc::new(Mutex::new(None)),
+            min_ram_usage: Arc::new(Mutex::new(0.0)),
+            recommended_ram_gb: Arc::new(Mutex::new(0.0)),
+            gpu_memory_gb: Arc::new(Mutex::new(None)),
+            temperature: Arc::new(Mutex::new(0.0)),
+            top_k: Arc::new(Mutex::new(0)),
+            top_p: Arc::new(Mutex::new(0.0)),
+            max_tokens: Arc::new(Mutex::new(0)),
+            repetition_penalty: Arc::new(Mutex::new(0.0)),
+            status: Arc::new(Mutex::new(ModelStatus::Stopped)),
+            last_used: Arc::new(Mutex::new(Utc::now())),
+            port: Arc::new(Mutex::new(None)),
+            server_url: Arc::new(Mutex::new(None)),
+            process_id: Arc::new(Mutex::new(None)),
+        }
+    }
 }
 
 impl ModelState {
@@ -48,6 +73,11 @@ impl ModelState {
             max_tokens: Arc::new(Mutex::new(config.defaults.max_tokens)),
             repetition_penalty: Arc::new(Mutex::new(config.defaults.repetition_penalty)),
             port: Arc::new(Mutex::new(config.server_config.port)),
+            server_url: Arc::new(
+                Mutex::new(
+                    Some(format!("http://localhost:{}", config.server_config.port.unwrap_or(0)))
+                )
+            ),
             status: Arc::new(Mutex::new(ModelStatus::Stopped)),
             last_used: Arc::new(Mutex::new(Utc::now())),
             process_id: Arc::new(Mutex::new(None)),
@@ -65,6 +95,10 @@ impl ModelState {
     pub fn update_process_id(&self, process_id: u32) {
         let mut process_id_guard = self.process_id.lock().unwrap();
         *process_id_guard = Some(process_id);
+    }
+    pub fn update_server_url(&self, server_url: String) {
+        let mut server_url_guard = self.server_url.lock().unwrap();
+        *server_url_guard = Some(server_url);
     }
     pub fn show_state(&self) {
         let status = self.status.lock().unwrap();

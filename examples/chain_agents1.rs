@@ -21,21 +21,17 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     let model_manager = Arc::new(ModelManager::new());
     model_manager.show_registry(); // get_model_registry
     info!("Gettig SmolTalk model");
-    let content_llm_request = Arc::new(
-        model_manager
-            .clone()
-            .get_llm("smolTalk", None).await
-            .map_err(|e| {
-                error!("Failed to Get SmolTalk model: {}", e);
-                e
-            })?
-    );
+    let content_llm = model_manager
+        .clone()
+        .get_llm("smolTalk", None).await
+        .map_err(|e| {
+            error!("Failed to Get SmolTalk model: {}", e);
+            e
+        })?;
 
     info!("Loading SmolTalk model");
-    let content_llm = content_llm_request.load_llm().await.map_err(|e| {
-        error!("Failed to load Granite model: {}", e);
-        e
-    })?;
+    content_llm.clone().load().await;
+    info!("SmolTalk Model loaded");
 
     let prompt_template =
         "
@@ -47,31 +43,24 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     ";
 
     let options = LLMHTTPCallOptions::new()
+        .with_server_url("http://localhost:5010".to_string()) // Add complete server URL
         .with_port(5010)
-        .with_prompt_template(prompt_template.to_string())
         .with_temperature(0.8)
+        .with_prompt_template(prompt_template.to_string())
         .build();
 
+    // Update this to return LLM Only Remove ModelRequest
     info!("Gettig Granite model");
-    let llama_llm_request = Arc::new(
-        model_manager
-            .clone()
-            .get_llm("granite", Some(options)).await
-            .map_err(|e| {
-                error!("Failed to load Granite model: {}", e);
-                e
-            })?
-    );
+    let llama_llm = model_manager
+        .clone()
+        .get_llm("granite", Some(options)).await
+        .map_err(|e| {
+            error!("Failed to Get Granite model: {}", e);
+            e
+        })?;
 
     info!("Loading Granite model");
-
-    let llama_llm = llama_llm_request.load_llm().await.map_err(|e| {
-        error!("Failed to load Granite model: {}", e);
-        e
-    })?;
-
-    model_manager.show_model_details().await;
-
+    llama_llm.clone().load().await;
     // Create agents
     let agent_1 = Arc::new(
         Mutex::new(
@@ -82,7 +71,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                     "Generate content on the topic - Future of AI agentix framework".to_string()
                 )
                 .with_stream(true)
-                .with_llm(content_llm.clone())
+                .with_llm(content_llm)
                 .build()
         )
     );
@@ -94,13 +83,12 @@ async fn main() -> Result<(), Box<dyn StdError>> {
                 .with_system_prompt("You are a great analyzer of generated content.".to_string())
                 .with_user_prompt("Analyze the generated content.".to_string())
                 .with_stream(true)
-                .with_llm(llama_llm.clone())
+                .with_llm(llama_llm)
                 .build()
         )
     );
     // Create a chain and add agents
     let mut chain = Chain::new().add_agent(agent_1).add_agent(agent_2);
-    model_manager.show_model_details().await;
     // Run the chain
     if let Err(e) = chain.run().await {
         eprintln!("Error executing chain: {}", e);
@@ -118,7 +106,5 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             log.timestamp
         );
     }
-    model_manager.show_model_details().await;
-
     Ok(())
 }
