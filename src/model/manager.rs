@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use libc::option;
 use log::{ error, info, warn };
 use tokio::sync::RwLock;
 use super::state::{ self, ModelState };
@@ -36,100 +37,6 @@ pub struct ModelManager {
 
     lock_in_progress: Arc<AtomicBool>,
     last_lock_holder: Arc<Mutex<Option<String>>>, // For debugging
-}
-
-pub struct ModelRequest {
-    pub manager: Arc<dyn ModelManagerInterface>,
-    pub options: Option<LLMHTTPCallOptions>,
-    pub state: Option<ModelState>,
-    pub config: Option<ModelConfig>,
-}
-
-impl ModelRequest {
-    pub fn new(
-        manager: Arc<dyn ModelManagerInterface>,
-        options: Option<LLMHTTPCallOptions>,
-        state: Option<ModelState>,
-        config: Option<ModelConfig>
-    ) -> Self {
-        Self {
-            state,
-            config,
-            manager,
-            options,
-        }
-    }
-
-    pub fn default() -> Self {
-        Self {
-            state: None,
-            config: None,
-            manager: Arc::new(ModelManager::new()),
-            options: None,
-        }
-    }
-
-    pub async fn load_llm(self: Arc<Self>) -> ModelResult<LLM> {
-        if let Some(state) = self.state.clone() {
-            Box::pin(self.load_llm_internal(state)).await
-        } else {
-            Err(ModelError::ProcessError("ModelState is None".to_string()))
-        }
-    }
-
-    async fn load_llm_internal(self: Arc<Self>, state: ModelState) -> ModelResult<LLM> {
-        //To Do
-        let config = state.config.clone();
-        let manager = self.manager.clone();
-        let model_status = self.manager.get_model_status(&config.model_config.name).await;
-        match model_status {
-            Ok(ModelStatus::Running) => {
-                info!("Model {} is already running", config.model_config.name);
-            }
-            _ => {
-                info!("Loading model: {}", config.model_config.name);
-                self.manager.load_model(state.clone()).await?;
-                // Verify model was loaded successfully
-                match manager.get_model_status(&config.model_config.name).await? {
-                    ModelStatus::Running => {
-                        info!("Model {} loaded successfully", config.model_config.name);
-                    }
-                    status => {
-                        error!("Model {} failed to load properly", config.model_config.name);
-                        return Err(
-                            ModelError::ProcessError(
-                                format!(
-                                    "Failed to load model: {}. Status: {:?}",
-                                    config.model_config.name,
-                                    status
-                                )
-                            )
-                        );
-                    }
-                }
-            }
-        }
-
-        let mut llm_options = self.options.clone().unwrap();
-        llm_options = llm_options
-            .with_port(state.port.lock().unwrap().unwrap_or(52555) as u16)
-            .with_prompt_template(config.prompt_template.template.clone());
-
-        // Apply model defaults if not overridden
-        if llm_options.temperature.is_none() {
-            llm_options = llm_options.with_temperature(config.defaults.temperature);
-        }
-
-        let processor = ModelManager::get_processor_for_model(&config);
-        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
-        Ok(
-            LLM::builder()
-                .with_model_manager(manager.clone(), config.model_config.name.to_string(), true)
-                .with_options(llm_options)
-                .with_process_response(move |stream| processor(stream))
-                .build()
-        )
-    }
 }
 
 impl ModelManager {
@@ -373,7 +280,7 @@ impl ModelManager {
         self: Arc<Self>,
         model_name: &str,
         options: Option<LLMHTTPCallOptions>
-    ) -> ModelResult<ModelRequest> {
+    ) -> ModelResult<LLM> {
         let config = self.registry.get_config(model_name).ok_or_else(|| {
             error!("Model configuration not found for: {}", model_name);
             ModelError::ModelNotFound(format!("Configuration not found for model: {}", model_name))
@@ -411,12 +318,10 @@ impl ModelManager {
         } else {
             info!("Options are not None");
             info!("Updating states based of the options");
+
             // Print what are the options passed
 
             if let Some(ref opts) = options {
-                info!("Options passed:");
-                info!("Updating state on the basis of the values passed.");
-
                 if !opts.temperature.is_none() {
                     *state.temperature.lock().unwrap() = opts.temperature.unwrap();
                 }
@@ -435,27 +340,34 @@ impl ModelManager {
                 if !opts.port.is_none() {
                     *state.port.lock().unwrap() = opts.port.clone();
                 }
-                info!("State has bee Updated");
+                info!("State has beem Updated");
             }
         }
+        //ToDo update state with the values present in the llm_options
+        // info!("Current model status: {:?}", model_status);
+        // Intiate a model state donot connect with Model Process but do not start yet
+
         let mut llm_options = options.unwrap_or_default();
         llm_options = llm_options
-            .with_port(config.server_config.port.unwrap_or(52555) as u16)
+            .with_port(state.port.lock().unwrap().unwrap_or(52555) as u16)
             .with_prompt_template(config.prompt_template.template.clone());
 
         // Apply model defaults if not overridden
         if llm_options.temperature.is_none() {
             llm_options = llm_options.with_temperature(config.defaults.temperature);
+            llm_options = llm_options.with_prompt_template(config.prompt_template.template.clone());
         }
-        //ToDo update state with the values present in the llm_options
-        // info!("Current model status: {:?}", model_status);
-        // Intiate a model state donot connect with Model Process but do not start yet
-        Ok(ModelRequest {
-            manager: self.clone(),
-            options: Some(llm_options),
-            state: Some(state),
-            config: Some(config.clone()),
-        })
+
+        let processor = ModelManager::get_processor_for_model(&config);
+        // let manager: Arc<dyn ModelManagerInterface> = Arc::new(self.clone());
+        Ok(
+            LLM::builder()
+                .with_state(state)
+                .with_model_manager(self.clone(), config.model_config.name.to_string(), true)
+                .with_options(llm_options)
+                .with_process_response(move |stream| processor(stream))
+                .build()
+        )
     }
 
     async fn manage_memory(&self, required_gb: f32) -> ModelResult<()> {
@@ -642,7 +554,7 @@ impl ModelManagerInterface for ModelManager {
         &self,
         model_name: &str,
         options: Option<LLMHTTPCallOptions>
-    ) -> ModelResult<ModelRequest> {
+    ) -> ModelResult<LLM> {
         // Existing implementation
         self.get_llm(model_name, options).await
     }

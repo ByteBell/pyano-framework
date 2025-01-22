@@ -33,6 +33,29 @@ pub struct ModelState {
     pub process_id: Arc<Mutex<Option<u32>>>,
 }
 
+impl Default for ModelState {
+    // implement default please
+    fn default() -> Self {
+        Self {
+            config: ModelConfig::default(),
+            model_path: Arc::new(Mutex::new(PathBuf::new())),
+            model_url: Arc::new(Mutex::new(None)),
+            min_ram_usage: Arc::new(Mutex::new(0.0)),
+            recommended_ram_gb: Arc::new(Mutex::new(0.0)),
+            gpu_memory_gb: Arc::new(Mutex::new(None)),
+            temperature: Arc::new(Mutex::new(0.0)),
+            top_k: Arc::new(Mutex::new(0)),
+            top_p: Arc::new(Mutex::new(0.0)),
+            max_tokens: Arc::new(Mutex::new(0)),
+            repetition_penalty: Arc::new(Mutex::new(0.0)),
+            status: Arc::new(Mutex::new(ModelStatus::Stopped)),
+            last_used: Arc::new(Mutex::new(Utc::now())),
+            port: Arc::new(Mutex::new(None)),
+            process_id: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
 impl ModelState {
     pub fn new(config: ModelConfig) -> Self {
         Self {
