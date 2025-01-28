@@ -5,7 +5,8 @@ use reqwest::Client;
 use super::manager_trait::ModelManagerInterface;
 use super::types::{ ModelConfig, ModelInfo, ModelStatus };
 use super::error::ModelResult;
-use crate::llm::llm_builder::LLM;
+use crate::llm::llm_builder::{ LLMBuilder, LLM };
+use super::state::ModelState;
 use crate::llm::options::LLMHTTPCallOptions;
 use crate::llm::stream_processing::{ llamacpp_process_stream, qwen_process_stream };
 
@@ -25,13 +26,13 @@ impl ModelManagerClient {
 
 #[async_trait]
 impl ModelManagerInterface for ModelManagerClient {
-    async fn load_model(&self, config: ModelConfig) -> ModelResult<()> {
-        let url = format!("{}/models/load", self.base_url);
-        let _ = self.client.post(&url).json(&config).send().await?.error_for_status();
+    async fn load_model(&self, _state: ModelState) -> ModelResult<()> {
+        let _url = format!("{}/models/load", self.base_url);
+        // let _ = self.client.post(&url).json(&config).send().await?.error_for_status();
         Ok(())
     }
 
-    async fn load_model_by_name(&self, name: &str) -> ModelResult<()> {
+    async fn load_model_by_name(&self, _name: &str) -> ModelResult<()> {
         // todo
         Ok(())
     }
@@ -60,11 +61,10 @@ impl ModelManagerInterface for ModelManagerClient {
         Ok(response.json().await?)
     }
 
-    async fn get_or_create_llm(
+    async fn get_llm(
         &self,
         model_name: &str,
-        options: Option<LLMHTTPCallOptions>,
-        auto_load: bool
+        options: Option<LLMHTTPCallOptions>
     ) -> ModelResult<LLM> {
         // todo add this to server
         // First ensure the model is loaded
@@ -79,7 +79,7 @@ impl ModelManagerInterface for ModelManagerClient {
                     .error_for_status()?
                     .json().await?;
 
-                self.load_model(config).await?;
+                self.load_model(ModelState::new(config)).await?;
             }
         }
         // Get the model's server details
@@ -91,8 +91,8 @@ impl ModelManagerInterface for ModelManagerClient {
             .json().await?;
 
         // Create LLM with the server information
-        let mut llm_options = options.unwrap_or_default();
-        llm_options = llm_options
+        let llm_options = options.unwrap_or_default();
+        llm_options
             .with_server_url(
                 format!(
                     "http://{}:{}",
@@ -107,12 +107,12 @@ impl ModelManagerInterface for ModelManagerClient {
                     .to_string()
             );
 
-        let processor = match server_info["model_kind"].as_str() {
+        let _processor = match server_info["model_kind"].as_str() {
             Some("LLaMA") => llamacpp_process_stream,
             Some("Qwen") => qwen_process_stream,
             _ => llamacpp_process_stream, // default
         };
 
-        Ok(LLM::builder().with_options(llm_options).with_process_response(processor).build())
+        Ok(LLMBuilder::default().build())
     }
 }

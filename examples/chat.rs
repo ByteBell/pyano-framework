@@ -1,7 +1,8 @@
 use std::error::Error as StdError;
 use std::io::{ self, Write };
-
+use log::{ info, error };
 use pyano::{
+    ModelManager,
     llm::{
         options::LLMHTTPCallOptions,
         llm_builder::LLM,
@@ -9,23 +10,28 @@ use pyano::{
     },
     agent::{ agent_builder::AgentBuilder, agent_trait::AgentTrait },
 };
+use std::sync::{ Arc, Mutex };
+use colored::Colorize;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn StdError>> {
-    let prompt_template =
-        "
-        <｜begin▁of▁sentence｜>{system_prompt}<｜User｜>{user_prompt}<｜Assistant｜>
-    ";
     let system_prompt = "Answer the user questions";
 
-    // Create LLMHTTPCallOptions with required configurations
-    let options = LLMHTTPCallOptions::new()
-        .with_server_url("http://localhost:52555".to_string())
-        .with_prompt_template(prompt_template.to_string())
-        .with_temperature(0.7)
-        .build();
+    let model_manager = Arc::new(ModelManager::new());
 
-    println!("Welcome to the LLM CLI! Type 'exit' to quit.");
+    let llm = model_manager
+        .clone()
+        .get_llm("deepseek-R1-7B", None).await
+        .map_err(|e| {
+            error!("Failed to Get DeepSeek model: {}", e);
+            e
+        })?;
+
+    llm.clone().load().await;
+    println!("{}", "deepseek-R1-7B loaded".bold().bright_yellow());
+    println!("");
+
+    println!("Welcome to the Pyano LLM CLI! Type 'exit' to quit.");
     // Define the user prompt
 
     // Execute the LLM call with the user prompt
@@ -43,18 +49,12 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             break;
         }
 
-        // Build a new LLM instance for each interaction
-        let llm = LLM::builder()
-            .with_options(options.clone())
-            .with_process_response(|stream| Box::pin(llamacpp_process_stream(stream)))
-            .build();
-
-        // Create a new agent for each interaction
+        // Create your chat agent
         let agent = AgentBuilder::new()
             .with_system_prompt(system_prompt.to_string())
             .with_user_prompt(user_prompt.to_string())
             .with_stream(true)
-            .with_llm(llm)
+            .with_llm(llm.clone())
             .build();
 
         match agent.invoke().await {
