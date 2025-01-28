@@ -5,7 +5,7 @@ use super::agent_trait::AgentTrait;
 use tokio_stream::StreamExt;
 use crate::tools::Tool;
 use std::sync::Arc;
-use log::info;
+use colored::Colorize;
 
 pub struct Agent {
     pub(crate) system_prompt: Option<String>,
@@ -60,21 +60,36 @@ impl AgentTrait for Agent {
 
             if stream {
                 let mut response_stream = llm.response_stream(user_prompt, system_prompt).await?;
+                let mut is_first_chunk = true;
+
                 while let Some(response) = response_stream.next().await {
                     match response {
                         Ok(bytes) => {
                             let chunk = String::from_utf8_lossy(&bytes).to_string();
+                            if is_first_chunk {
+                                println!("");
+                                println!("{}", "====Response begin====\n".green());
+                                println!("");
+                                is_first_chunk = false;
+                            }
                             print!("{}", chunk); // Stream to the console
                             output.push_str(&chunk); // Collect into buffer
                         }
                         Err(e) => eprintln!("Error streaming response: {}", e),
                     }
                 }
+                if !is_first_chunk {
+                    println!("");
+                    println!("{}", "====Response ends====".green());
+                    println!("");
+                }
             } else {
                 let response = llm.response(user_prompt, system_prompt).await?;
                 // Safely extract and convert `response["content"]` to a string
                 if let Some(content) = response.get("content").and_then(|v| v.as_str()) {
+                    println!("");
                     println!("Response: {}", content);
+                    println!("");
                     output.push_str(content); // Append content to output buffer
                 } else {
                     eprintln!("Error: `content` field is missing or not a string in the response");

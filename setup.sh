@@ -2,9 +2,10 @@
 
 # Name of the .env file
 ENV_FILE=".env"
-HOME="pyano_home"
-MODEL_HOME="pyano_home/models"
-CONFIG_HOME="pyano_home/configs"
+PYANO_HOME="pyano_home"
+MODEL_HOME="${PYANO_HOME}/models"
+CONFIG_HOME="${PYANO_HOME}/configs"
+ADAPTERS_HOME="${PYANO_HOME}/adapters"
 
 # Check if the file already exists
 if [ -f "$ENV_FILE" ]; then
@@ -19,18 +20,20 @@ fi
 # Write environment variables to the file
 cat > "$ENV_FILE" <<EOL
 # Environment variables
-HOME=pyano_home
-MODEL_HOME=pyano_home/models
-CONFIG_HOME=pyano_home/configs
+PYANO_HOME=${PYANO_HOME}
+MODEL_HOME=${MODEL_HOME}
+CONFIG_HOME=${CONFIG_HOME}
+ADAPTERS_HOME=${ADAPTERS_HOME}
 EOL
 
 echo "$ENV_FILE has been created."
 
 # Check if directories exist, if not create them
-for dir in "$HOME" "$MODEL_HOME" "$CONFIG_HOME"; do
+for dir in "$PYANO_HOME" "$MODEL_HOME" "$CONFIG_HOME" "$ADAPTERS_HOME"; do
         if [ ! -d "$dir" ]; then
                 echo "Directory $dir does not exist. Creating it."
                 mkdir -p "$dir"
+                sleep 1
         else
                 echo "Directory $dir already exists."
         fi
@@ -64,9 +67,9 @@ DOWNLOAD_DIR="pyano_home/downloads"
 
 # Create the download directory if it doesn't exist
 if [[ "$OS" == "linux" ]]; then
-    DOWNLOAD_DIR="src/models/adapters/llama/ubuntu"
+    DOWNLOAD_DIR="$ADAPTERS_HOME/llama/ubuntu"
 elif [[ "$OS" == "macos" ]]; then
-    DOWNLOAD_DIR="src/models/adapters/llama/macos"
+    DOWNLOAD_DIR="$ADAPTERS_HOME/llama/macos/arm64"
 fi
 
 if [ ! -d "$DOWNLOAD_DIR" ]; then
@@ -89,19 +92,29 @@ unzip -o "$ZIP_FILE" -d "$DOWNLOAD_DIR/llama"
 
 echo "Unzip completed."
 
-# Move a specific file from the unzipped files to a specific directory
-SPECIFIC_FILE="$DOWNLOAD_DIR/llama/build/bin/llama-server"
 
-if [ -f "$SPECIFIC_FILE" ]; then
-    if [ ! -d "$DOWNLOAD_DIR" ]; then
-        echo "Directory $DOWNLOAD_DIR does not exist. Creating it."
-        mkdir -p "$DOWNLOAD_DIR"
+# Create the download directory if it doesn't exist
+if [[ "$OS" == "linux" ]]; then
+   # Move a specific file from the unzipped files to a specific directory
+    SPECIFIC_FILE="$DOWNLOAD_DIR/llama/build/bin/llama-server"
+
+
+    if [ -f "$SPECIFIC_FILE" ]; then
+        if [ ! -d "$DOWNLOAD_DIR" ]; then
+            echo "Directory $DOWNLOAD_DIR does not exist. Creating it."
+            mkdir -p "$DOWNLOAD_DIR"
+        fi
+        mv "$SPECIFIC_FILE" "$DOWNLOAD_DIR/"
+        echo "Moved $SPECIFIC_FILE to $DOWNLOAD_DIR."
+    else
+        echo "File $SPECIFIC_FILE does not exist. No file moved."
     fi
-    mv "$SPECIFIC_FILE" "$DOWNLOAD_DIR/"
-    echo "Moved $SPECIFIC_FILE to $DOWNLOAD_DIR."
-else
-    echo "File $SPECIFIC_FILE does not exist. No file moved."
+elif [[ "$OS" == "macos" ]]; then
+    DOWNLOAD_DIR="$ADAPTERS_HOME/llama/macos/arm64"
+    cp -r "$DOWNLOAD_DIR/llama/build/bin/" $DOWNLOAD_DIR
 fi
+
+
 
 # Clean up the downloaded files
 

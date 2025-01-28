@@ -8,19 +8,33 @@ use pyano::{
 };
 use log::{ info, error };
 use std::sync::{ Arc, Mutex };
+use env_logger::Builder;
+use std::io::Write; // Add this import
+
+pub fn setup_logger() {
+    Builder::from_default_env()
+        .format(|buf, record| {
+            if record.level() == log::Level::Info {
+                writeln!(buf, "{}", record.args())
+            } else {
+                // Keep full format for other log levels
+                writeln!(buf, "[{}] {}: {}", record.level(), record.target(), record.args())
+            }
+        })
+        .init();
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn StdError>> {
     // Initialize logging
-    std::env::set_var("RUST_LOG", "debug");
-    std::env::set_var("RUST_BACKTRACE", "1");
 
-    env_logger::init();
+    std::env::set_var("RUST_LOG", "info");
+    setup_logger();
 
-    info!("Initializing ModelManager");
+    // std::env::set_var("RUST_BACKTRACE", "1");
+
     let model_manager = Arc::new(ModelManager::new());
     model_manager.show_registry(); // get_model_registry
-    info!("Gettig SmolTalk model");
     let content_llm = model_manager
         .clone()
         .get_llm("smolTalk", None).await
@@ -29,9 +43,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             e
         })?;
 
-    info!("Loading SmolTalk model");
-    content_llm.clone().load().await;
-    info!("SmolTalk Model loaded");
+    // content_llm.clone().load().await;
 
     let prompt_template =
         "
@@ -50,7 +62,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
         .build();
 
     // Update this to return LLM Only Remove ModelRequest
-    info!("Gettig Granite model");
+
     let llama_llm = model_manager
         .clone()
         .get_llm("granite", Some(options)).await
@@ -59,8 +71,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
             e
         })?;
 
-    info!("Loading Granite model");
-    llama_llm.clone().load().await;
+    // llama_llm.clone().load().await;
     // Create agents
     let agent_1 = Arc::new(
         Mutex::new(
@@ -93,18 +104,17 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     if let Err(e) = chain.run().await {
         eprintln!("Error executing chain: {}", e);
     }
-    model_manager.show_model_details().await;
 
     // Access the memory logs
-    let logs = chain.memory_logs();
-    for log in logs {
-        println!(
-            "Agent: {}, Input: {}, Output: {}, Timestamp: {:?}",
-            log.agent_name,
-            log.input,
-            log.output,
-            log.timestamp
-        );
-    }
+    // let logs = chain.memory_logs();
+    // for log in logs {
+    //     println!(
+    //         "Agent: {}, Input: {}, Output: {}, Timestamp: {:?}",
+    //         log.agent_name,
+    //         log.input,
+    //         log.output,
+    //         log.timestamp
+    //     );
+    // }
     Ok(())
 }
