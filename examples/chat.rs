@@ -21,14 +21,14 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     let llm = model_manager
         .clone()
-        .get_llm("deepseek-distilled-r1-32B", None).await
+        .get_llm("deepseek-R1-7B", None).await
         .map_err(|e| {
             error!("Failed to Get DeepSeek model: {}", e);
             e
         })?;
 
     llm.clone().load().await;
-    println!("{}", "Deepseek-r1 loaded".bold().bright_yellow());
+    println!("{}", "deepseek-R1-7B loaded".bold().bright_yellow());
     println!("");
 
     println!("Welcome to the Pyano LLM CLI! Type 'exit' to quit.");
