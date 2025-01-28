@@ -98,7 +98,7 @@ impl AgentTrait for Agent {
 
                             if is_first_chunk {
                                 println!("");
-                                println!("{}", "INFO: ====Response begin====\n".green());
+                                println!("{}", "====Response begin====\n".green());
                                 println!("");
                                 is_first_chunk = false;
                             }
@@ -119,7 +119,7 @@ impl AgentTrait for Agent {
                 }
                 if !is_first_chunk {
                     println!("");
-                    println!("{}", "INFO: ====Response ends====".green());
+                    println!("{}", "====Response ends====".green());
                     println!("");
                 }
             } else {

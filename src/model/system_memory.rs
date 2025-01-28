@@ -108,14 +108,14 @@ impl SystemMemory {
         let total_gb = (sys.total_memory() as f64) / (1024.0 * 1024.0 * 1024.0);
         let used_gb = (sys.used_memory() as f64) / (1024.0 * 1024.0 * 1024.0);
         let available_gb = total_gb - used_gb;
-        info!("");
-        info!("=== Memory Debug Information ===");
-        info!("Total memory (GB): {:.2}", total_gb);
-        info!("Used memory (GB): {:.2}", used_gb);
-        info!("Available memory (GB): {:.2}", available_gb);
-        info!("Memory usage (%): {:.1}", (used_gb / total_gb) * 100.0);
-        info!("==============================");
-        info!("");
+        debug!("");
+        debug!("=== Memory Debug Information ===");
+        debug!("Total memory (GB): {:.2}", total_gb);
+        debug!("Used memory (GB): {:.2}", used_gb);
+        debug!("Available memory (GB): {:.2}", available_gb);
+        debug!("Memory usage (%): {:.1}", (used_gb / total_gb) * 100.0);
+        debug!("==============================");
+        debug!("");
     }
 }
 
