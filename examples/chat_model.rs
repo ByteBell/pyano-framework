@@ -15,20 +15,32 @@ use colored::Colorize;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn StdError>> {
+    // std::env::set_var("RUST_LOG", "debug");
     let system_prompt = "Answer the user questions";
 
     let model_manager = Arc::new(ModelManager::new());
 
+    model_manager.show_models();
+
+    println!("Enter a model from the list");
+    print!("> ");
+    io::stdout().flush()?;
+
+    let mut model_input = String::new();
+    io::stdin().read_line(&mut model_input)?;
+
+    let model_name = model_input.trim();
+
     let llm = model_manager
         .clone()
-        .get_llm("deepseek-distilled-r1-32B", None).await
+        .get_llm(model_name, None).await
         .map_err(|e| {
-            error!("Failed to Get DeepSeek model: {}", e);
+            error!("Failed to Get {} model: {}", model_name, e);
             e
         })?;
 
     llm.clone().load().await;
-    println!("{}", "Deepseek-r1 loaded".bold().bright_yellow());
+    println!("{} {}", model_name, " loaded".bold().bright_yellow());
     println!("");
 
     println!("Welcome to the Pyano LLM CLI! Type 'exit' to quit.");

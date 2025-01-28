@@ -522,14 +522,14 @@ impl ModelManager {
 
     // Add show registry function
 
-    pub fn show_registry(&self) {
+    pub fn show_models(&self) {
         // get_all_models
-        info!("\n\n");
-        info!("Available models in the registry:");
+        println!("\n\n");
+        println!("Available models: ");
         for (name, config) in self.registry.get_all_configs() {
-            info!("Model Name: {}, Type: {:?}", name, config.model_config.model_type);
+            println!("Model Name: {}, Type: {:?}", name, config.model_config.model_type);
         }
-        info!("\n\n");
+        println!("\n\n");
     }
 }
 

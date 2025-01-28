@@ -80,6 +80,7 @@ async fn process_chunk(chunk_str: &str) -> String {
                             timing_struct.predicted_n,
                             timing_struct.predicted_ms
                         );
+                        println!("");
                         info!(
                             "Tokens generated per second: {:.2}",
                             tokens_per_second.to_string().yellow()

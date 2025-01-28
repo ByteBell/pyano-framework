@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
     // std::env::set_var("RUST_BACKTRACE", "1");
 
     let model_manager = Arc::new(ModelManager::new());
-    model_manager.show_registry(); // get_model_registry
+    model_manager.show_models(); // get_model_registry
     let content_llm = model_manager
         .clone()
         .get_llm("smolTalk", None).await

@@ -1,6 +1,6 @@
 {
   "model_config": {
-    "name": "DeepSeek-R1",
+    "name": "deepseek-R1-7B",
     "model_type": "Text",
     "model_kind": "Qwen",
     "model_path": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf",

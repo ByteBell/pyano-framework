@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 
     let researcher_llm = model_manager
         .clone()
-        .get_llm("DeepSeek-R1", None).await
+        .get_llm("deepseek-R1-7B", None).await
         .map_err(|e| {
             error!("Failed to Get DeepSeek model: {}", e);
             e
