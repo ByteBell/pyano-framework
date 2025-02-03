@@ -9,14 +9,18 @@ use super::state::ModelState;
 use reqwest::Client;
 use super::error::{ ModelError, ModelResult };
 use std::process::{ Child, Stdio };
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
+#[cfg(windows)]
 use winapi::um::processthreadsapi::TerminateProcess;
+#[cfg(windows)]
 use winapi::um::handleapi::CloseHandle;
+#[cfg(windows)]
 use winapi::um::winnt::HANDLE;
+#[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
 // use std::io::{ BufReader, BufRead };
 // use std::thread;
-
 
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(60);
@@ -180,12 +184,11 @@ impl ModelProcess {
 
             #[cfg(windows)]
             {
-
                 let handle: HANDLE = child.as_raw_handle();
-                if unsafe { TerminateProcess(handle, 1) } == 0 {
+                if (unsafe { TerminateProcess(handle, 1) }) == 0 {
                     error!("Failed to terminate process gracefully on Windows");
                 }
-                unsafe { CloseHandle(handle) };
+                unsafe { CloseHandle(handle) }
             }
             sleep(Duration::from_secs(5));
             // Wait for process to exit with timeout
@@ -205,10 +208,10 @@ impl ModelProcess {
             #[cfg(windows)]
             {
                 let handle: HANDLE = child.as_raw_handle();
-                if unsafe { TerminateProcess(handle, 1) } == 0 {
+                if (unsafe { TerminateProcess(handle, 1) }) == 0 {
                     error!("Failed to terminate process forcefully on Windows");
                 }
-                unsafe { CloseHandle(handle) };
+                unsafe { CloseHandle(handle) }
             }
         }
 
