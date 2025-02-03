@@ -57,6 +57,9 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 elif [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
         ZIP_URL="https://github.com/ggerganov/llama.cpp/releases/download/b4557/llama-b4557-bin-macos-arm64.zip"
+elif [[ "$OSTYPE" == "msys"* ]]; then
+        OS="windows"
+        ZIP_URL="https://github.com/ggerganov/llama.cpp/releases/download/b4527/llama-b4527-bin-win-openblas-x64.zip"
 else
         echo "Unsupported operating system: $OSTYPE"
         exit 1
@@ -70,6 +73,8 @@ if [[ "$OS" == "linux" ]]; then
     DOWNLOAD_DIR="$ADAPTERS_HOME/llama/ubuntu"
 elif [[ "$OS" == "macos" ]]; then
     DOWNLOAD_DIR="$ADAPTERS_HOME/llama/macos/arm64"
+elif [[ "$OS" == "windows" ]]; then
+    DOWNLOAD_DIR="$ADAPTERS_HOME/llama/windows"
 fi
 
 if [ ! -d "$DOWNLOAD_DIR" ]; then

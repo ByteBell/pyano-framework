@@ -30,7 +30,10 @@ impl LlamaProcess {
                 } else {
                     format!("{}/llama/macos/x64/llama-server", adapters_dir)
                 }
-            } else {
+            } else if cfg!(target_os = "windows") {
+                format!("{}/llama/windows/llama-server.exe", adapters_dir)
+            }
+            else {
                 format!("{}/llama/ubuntu/llama-server", adapters_dir)
             }
         ).to_string();

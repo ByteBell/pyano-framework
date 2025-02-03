@@ -12,6 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 dotenv = "0.15.0"
+winapi = "0.3.8"
 tokio = { version = "1.28", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0.8"

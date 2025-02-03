@@ -9,8 +9,14 @@ use super::state::ModelState;
 use reqwest::Client;
 use super::error::{ ModelError, ModelResult };
 use std::process::{ Child, Stdio };
+use std::os::windows::process::CommandExt;
+use winapi::um::processthreadsapi::TerminateProcess;
+use winapi::um::handleapi::CloseHandle;
+use winapi::um::winnt::HANDLE;
+use std::os::windows::io::AsRawHandle;
 // use std::io::{ BufReader, BufRead };
 // use std::thread;
+
 
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(60);
@@ -161,23 +167,48 @@ impl ModelProcess {
             let pid = child.id();
 
             // Try graceful shutdown first
-            if let Err(e) = child.kill() {
-                error!("Failed to kill process gracefully: {}", e);
-                // Force kill as backup
-                unsafe {
-                    libc::kill(pid as i32, libc::SIGKILL);
+            #[cfg(unix)]
+            {
+                if let Err(e) = child.kill() {
+                    error!("Failed to kill process gracefully: {}", e);
+                    // Force kill as backup
+                    unsafe {
+                        libc::kill(pid as i32, libc::SIGKILL);
+                    }
                 }
+            }
+
+            #[cfg(windows)]
+            {
+
+                let handle: HANDLE = child.as_raw_handle();
+                if unsafe { TerminateProcess(handle, 1) } == 0 {
+                    error!("Failed to terminate process gracefully on Windows");
+                }
+                unsafe { CloseHandle(handle) };
             }
             sleep(Duration::from_secs(5));
             // Wait for process to exit with timeout
+            let mut child = child;
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), async {
-                let mut child = child;
                 let _ = child.wait();
             }).await;
 
             // Force kill again if still running
-            unsafe {
-                libc::kill(pid as i32, libc::SIGKILL);
+            #[cfg(unix)]
+            {
+                unsafe {
+                    libc::kill(pid as i32, libc::SIGKILL);
+                }
+            }
+
+            #[cfg(windows)]
+            {
+                let handle: HANDLE = child.as_raw_handle();
+                if unsafe { TerminateProcess(handle, 1) } == 0 {
+                    error!("Failed to terminate process forcefully on Windows");
+                }
+                unsafe { CloseHandle(handle) };
             }
         }
 
